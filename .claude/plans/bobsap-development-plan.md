@@ -231,3 +231,4 @@ TDD 対象。先に `tests/Fixtures/SimpleProject/` を作る（interface / abst
 
 - 2026-07-11 プラン作成
 - 2026-07-11 Phase 0 完了 (commit 0c4ee9d) — 残課題: php-cs-fixer 実行時の PHP 8.4 警告（無害、必要なら 8.3 に固定）
+- 2026-07-11 Phase 1 完了 (commit 4362098) — 設計メモ: 組み込みクラスへの依存も Analyzer は記録する（フィルタは Phase 2 の責務）。無名クラスは宣言・依存とも収集しない。exclude パターンは探索ルートからの相対パスに fnmatch
