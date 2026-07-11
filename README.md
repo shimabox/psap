@@ -32,8 +32,8 @@
 配布用イメージをビルドして、解析したいプロジェクトをカレントディレクトリとしてマウントします。
 
 ```bash
-# イメージをビルド
-docker build -t bobsap -f docker/Dockerfile .
+# イメージをビルド（--target dist を明示。省略すると PlantUML 同梱の大きいイメージになる）
+docker build -t bobsap --target dist -f docker/Dockerfile .
 
 # 解析対象プロジェクトのルートで実行（$PWD が /workdir にマウントされる）
 docker run --rm -v "$PWD":/workdir bobsap analyze src/
@@ -44,6 +44,31 @@ docker run --rm -v "$PWD":/workdir bobsap analyze src/
 ```bash
 cd /path/to/other-project
 docker run --rm -v "$PWD":/workdir bobsap analyze src/ --depth 2
+```
+
+### PlantUML 同梱イメージ（analyze して即 PNG）
+
+`--format plantuml` の出力をそのまま画像化したいだけなら、PlantUML レンダラー（Java + plantuml.jar + graphviz + CJK フォント）を同梱した `dist-plantuml` イメージが便利です。`analyze-png` というショートカットコマンドで、計測から PNG 出力までを1コマンドで行えます。
+
+```bash
+# イメージをビルド（make build-plantuml でも同じ）
+docker build -t bobsap:plantuml --target dist-plantuml -f docker/Dockerfile .
+
+# 解析対象プロジェクトのルートで実行すると、カレントディレクトリに bobsap-report.png ができる
+docker run --rm -v "$PWD":/workdir bobsap:plantuml analyze-png src/ --depth 2
+```
+
+`analyze-png` 以外の引数を渡した場合は通常の `dist` イメージと同じく `bobsap` コマンドとして動作します（`docker run --rm -v "$PWD":/workdir bobsap:plantuml analyze src/` のように使えます）。
+
+このイメージは Java・graphviz・CJK フォントを含むため、`dist` イメージ（約 545MB）より大きくなります（手元のビルドで約 940MB）。PNG 化が不要な用途では通常の `dist` イメージを使ってください。
+
+### phar（単一ファイル配布）
+
+Docker が使えない環境向けに、`clue/phar-composer` で単一ファイルの `bobsap.phar` を生成できます（開発者向け。生成コマンドは後述の「開発者向け」セクション参照）。
+
+```bash
+make phar
+php bobsap.phar analyze src/
 ```
 
 ### Composer 経由
@@ -286,7 +311,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: build bobsap image
-        run: docker build -t bobsap -f docker/Dockerfile .
+        run: docker build -t bobsap --target dist -f docker/Dockerfile .
       - name: run analyze with threshold gate
         run: docker run --rm -v "$PWD":/workdir bobsap analyze src/ --threshold 0.6
 ```
@@ -314,14 +339,25 @@ jobs:
 開発コマンドはすべて Docker 経由です。ホストマシンに PHP / Composer は不要です。
 
 ```bash
-make setup   # イメージをビルドして composer install
-make test    # phpunit
-make stan    # phpstan（level: max）
-make cs      # コーディングスタイルチェック（dry-run）
-make cs-fix  # コーディングスタイルを自動整形
+make setup          # イメージをビルドして composer install
+make test           # phpunit
+make stan           # phpstan（level: max）
+make cs             # コーディングスタイルチェック（dry-run）
+make cs-fix         # コーディングスタイルを自動整形
+make phar           # bobsap.phar を生成する（clue/phar-composer。docker/Dockerfile の phar ステージを利用）
+make build-dist     # 配布用の実行イメージをビルドする（bobsap:dist）
+make build-plantuml # PlantUML 同梱の配布用イメージをビルドする（bobsap:plantuml）
 ```
 
 Makefile を経由せず直接叩く場合は `docker compose run --rm app composer test` のように実行します。
+
+### 配布物のスリム化（.gitattributes）
+
+`.gitattributes` で `tests/` / `.github/` / `docker/` / `compose.yaml` / `Makefile` / 各種設定ファイル（`phpunit.xml.dist` 等）を `export-ignore` にしています。`git archive`（Packagist・GitHub のリリース tarball 生成で使われる）で配布物を作ると、これらの開発専用ファイルが含まれず配布物がスリム化されます。ローカルの `git archive` では確認できますが、`export-ignore` は対象ファイルがコミット済みであって初めて有効になる点に注意してください。
+
+```bash
+git archive HEAD | tar -t | head -30
+```
 
 ### CI（GitHub Actions）
 

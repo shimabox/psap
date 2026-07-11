@@ -1,7 +1,7 @@
-# 開発用の薄いラッパー。実体は docker compose run --rm app ...
+# 開発用の薄いラッパー。実体は docker compose run --rm app ... / docker build ...
 .DEFAULT_GOAL := help
 
-.PHONY: help setup test stan cs cs-fix
+.PHONY: help setup test stan cs cs-fix phar build-dist build-plantuml
 
 help: ## このヘルプを表示する
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -21,3 +21,16 @@ cs: ## コーディングスタイルをチェックする（dry-run）
 
 cs-fix: ## コーディングスタイルを自動整形する
 	docker compose run --rm app composer cs:fix
+
+phar: ## bobsap.phar を生成する（docker/Dockerfile の phar ステージ、clue/phar-composer を利用）
+	docker build -t bobsap-phar-builder --target phar -f docker/Dockerfile .
+	docker run --rm --entrypoint cat bobsap-phar-builder /app/bobsap.phar > bobsap.phar
+	chmod +x bobsap.phar
+	docker rmi bobsap-phar-builder > /dev/null
+	@echo "Generated: bobsap.phar"
+
+build-dist: ## 配布用の実行イメージをビルドする（bobsap:dist タグ）
+	docker build -t bobsap:dist --target dist -f docker/Dockerfile .
+
+build-plantuml: ## PlantUML 同梱の配布用イメージをビルドする（bobsap:plantuml タグ）
+	docker build -t bobsap:plantuml --target dist-plantuml -f docker/Dockerfile .
