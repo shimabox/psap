@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Bobsap\Analyzer;
 
 use Bobsap\Analyzer\Internal\DependencyNameCollector;
+use Bobsap\Analyzer\Internal\DocblockTypeExtractor;
 use Bobsap\Analyzer\Internal\RootClassLikeCollector;
 use PhpParser\Error;
+use PhpParser\NameContext;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\NodeTraverser;
@@ -23,14 +25,20 @@ use PhpParser\ParserFactory;
  *
  * PHP 組み込みクラス（\Exception 等）への依存もフィルタリングせずそのまま記録する。
  * 「解析対象外への依存を無視する」判断は Phase 2（メトリクス計算）の責務。
+ *
+ * $useDocblock（デフォルト true）を有効にすると、プロパティの `@var` とメソッドの
+ * `@param` / `@return` からもクラス名候補を収集する（`--no-docblock` で無効化できる）。
+ * 短縮名の解決には NameResolver が保持する NameContext をそのまま使う。
  */
 final class DependencyAnalyzer
 {
     private readonly Parser $parser;
+    private readonly ?DocblockTypeExtractor $docblockExtractor;
 
-    public function __construct(?Parser $parser = null)
+    public function __construct(?Parser $parser = null, bool $useDocblock = true)
     {
         $this->parser = $parser ?? (new ParserFactory())->createForNewestSupportedVersion();
+        $this->docblockExtractor = $useDocblock ? new DocblockTypeExtractor() : null;
     }
 
     /**
@@ -61,12 +69,13 @@ final class DependencyAnalyzer
                 continue;
             }
 
+            $nameResolver = new NameResolver();
             $traverser = new NodeTraverser();
-            $traverser->addVisitor(new NameResolver());
+            $traverser->addVisitor($nameResolver);
             /** @var list<Stmt> $resolvedAst */
             $resolvedAst = $traverser->traverse($ast);
 
-            foreach ($this->extractClassInfos($resolvedAst, $filePath) as $classInfo) {
+            foreach ($this->extractClassInfos($resolvedAst, $filePath, $nameResolver->getNameContext()) as $classInfo) {
                 $classInfos[] = $classInfo;
             }
         }
@@ -78,7 +87,7 @@ final class DependencyAnalyzer
      * @param list<Stmt> $ast
      * @return list<ClassInfo>
      */
-    private function extractClassInfos(array $ast, string $filePath): array
+    private function extractClassInfos(array $ast, string $filePath, NameContext $nameContext): array
     {
         $rootCollector = new RootClassLikeCollector();
         $traverser = new NodeTraverser();
@@ -97,7 +106,7 @@ final class DependencyAnalyzer
                 fqcn: $fqcn,
                 kind: $this->resolveKind($root),
                 filePath: $filePath,
-                dependencies: $this->collectDependencyNames($root),
+                dependencies: $this->collectDependencyNames($root, $nameContext),
             );
         }
 
@@ -118,9 +127,9 @@ final class DependencyAnalyzer
     /**
      * @return list<string>
      */
-    private function collectDependencyNames(ClassLike $root): array
+    private function collectDependencyNames(ClassLike $root, NameContext $nameContext): array
     {
-        $collector = new DependencyNameCollector($root);
+        $collector = new DependencyNameCollector($root, $this->docblockExtractor, $nameContext);
         $traverser = new NodeTraverser();
         $traverser->addVisitor($collector);
         $traverser->traverse([$root]);

@@ -85,6 +85,12 @@ final class AnalyzeCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 '循環依存（ADP違反）が1つでもあれば exit code 1 にする',
+            )
+            ->addOption(
+                'no-docblock',
+                null,
+                InputOption::VALUE_NONE,
+                'docblock（@var / @param / @return）からの依存抽出を無効にする',
             );
     }
 
@@ -128,8 +134,11 @@ final class AnalyzeCommand extends Command
         /** @var bool $failOnCycle */
         $failOnCycle = $input->getOption('fail-on-cycle');
 
+        /** @var bool $noDocblock */
+        $noDocblock = $input->getOption('no-docblock');
+
         $files = (new SourceFinder())->find($paths, $excludePatterns);
-        $analysisResult = (new DependencyAnalyzer())->analyze($files);
+        $analysisResult = (new DependencyAnalyzer(useDocblock: !$noDocblock))->analyze($files);
         $components = (new ComponentClassifier())->classify($analysisResult->classInfos, $depth);
         $componentMetrics = (new MetricsCalculator())->calculate($components);
         $summary = MetricsSummary::from($componentMetrics);

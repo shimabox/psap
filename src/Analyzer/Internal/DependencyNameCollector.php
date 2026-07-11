@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bobsap\Analyzer\Internal;
 
+use PhpParser\NameContext;
 use PhpParser\Node;
 use PhpParser\Node\ComplexType;
 use PhpParser\Node\Expr;
@@ -26,6 +27,10 @@ use PhpParser\NodeVisitorAbstract;
  * 入れ子の型宣言（無名クラスの本体等）は別スコープなので、そこに現れる依存は
  * $root の依存としては拾わない（境界で探索を止める）。
  *
+ * docblock 解析（$docblockExtractor と $nameContext の両方が渡されたときだけ有効）は
+ * プロパティの `@var` とメソッドの `@param` / `@return` を対象にする。
+ * docblock 内の短縮名は $nameContext（NameResolver::getNameContext()）で FQCN 解決する。
+ *
  * @internal DependencyAnalyzer の実装詳細
  */
 final class DependencyNameCollector extends NodeVisitorAbstract
@@ -33,8 +38,11 @@ final class DependencyNameCollector extends NodeVisitorAbstract
     /** @var list<string> */
     public array $names = [];
 
-    public function __construct(private readonly ClassLike $root)
-    {
+    public function __construct(
+        private readonly ClassLike $root,
+        private readonly ?DocblockTypeExtractor $docblockExtractor = null,
+        private readonly ?NameContext $nameContext = null,
+    ) {
     }
 
     public function enterNode(Node $node): int|null
@@ -90,6 +98,7 @@ final class DependencyNameCollector extends NodeVisitorAbstract
         if ($node instanceof Stmt\Property) {
             $names = $this->namesFromAttributeGroups($node->attrGroups);
             $this->appendType($names, $node->type);
+            $names = [...$names, ...$this->namesFromVarDocblock($node)];
 
             return $names;
         }
@@ -104,6 +113,7 @@ final class DependencyNameCollector extends NodeVisitorAbstract
         if ($node instanceof Stmt\ClassMethod) {
             $names = $this->namesFromAttributeGroups($node->attrGroups);
             $this->appendType($names, $node->returnType);
+            $names = [...$names, ...$this->namesFromMethodDocblock($node)];
 
             return $names;
         }
@@ -232,6 +242,59 @@ final class DependencyNameCollector extends NodeVisitorAbstract
         }
 
         return [];
+    }
+
+    /**
+     * プロパティの `@var` docblock からクラス名候補の FQCN を集める。
+     *
+     * @return list<string>
+     */
+    private function namesFromVarDocblock(Stmt\Property $node): array
+    {
+        if ($this->docblockExtractor === null || $this->nameContext === null) {
+            return [];
+        }
+
+        $doc = $node->getDocComment();
+        if ($doc === null) {
+            return [];
+        }
+
+        return $this->docblockExtractor->extractVarTypeNames($doc->getText(), $this->nameContext);
+    }
+
+    /**
+     * メソッドの docblock から `@return` と各引数の `@param` のクラス名候補の FQCN を集める。
+     * コンストラクタのプロモートされた引数もここで拾える（docblock はメソッド側に書かれるため）。
+     *
+     * @return list<string>
+     */
+    private function namesFromMethodDocblock(Stmt\ClassMethod $node): array
+    {
+        if ($this->docblockExtractor === null || $this->nameContext === null) {
+            return [];
+        }
+
+        $doc = $node->getDocComment();
+        if ($doc === null) {
+            return [];
+        }
+
+        $docText = $doc->getText();
+        $names = $this->docblockExtractor->extractReturnTypeNames($docText, $this->nameContext);
+
+        foreach ($node->getParams() as $param) {
+            if (!$param->var instanceof Expr\Variable || !is_string($param->var->name)) {
+                continue;
+            }
+
+            $names = [
+                ...$names,
+                ...$this->docblockExtractor->extractParamTypeNames($docText, $param->var->name, $this->nameContext),
+            ];
+        }
+
+        return $names;
     }
 
     /**

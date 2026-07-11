@@ -70,6 +70,7 @@ bobsap analyze <paths>... [options]
 | `--exclude` | 除外パターン（fnmatch 形式、複数指定可） | なし |
 | `--threshold` | D 値がこの値を超えるコンポーネントがあれば exit code 1 にする | なし（チェックしない） |
 | `--fail-on-cycle` | 循環依存（ADP違反）が1つでもあれば exit code 1 にする | なし（チェックしない） |
+| `--no-docblock` | docblock（`@var` / `@param` / `@return`）からの依存抽出を無効にする | なし（docblock も解析する） |
 
 ### exit code
 
@@ -296,7 +297,7 @@ jobs:
 
 以下は v1 のスコープ外です。実装は行いません。
 
-- **docblock 内の型は数えない**（`@var X`、`@param X` 等。実コードの型宣言のみを解析対象とする）
+- **docblock 内の型も解析対象**（プロパティの `@var X`、メソッド・コンストラクタの `@param X $p` / `@return X`。プロモートされたコンストラクタ引数の `@param` も対象。`X[]` / `array<X>` / `array<int, X>` / `?X` / `X|Y` / `X&Y` の分解、短縮名の use文・名前空間による FQCN 解決に対応。プリミティブ・疑似型（`int`、`mixed`、`self` 等）は除外。壊れた docblock は無視してスキップする。`--no-docblock` でこの解析を無効化できる）
 - **文字列ベースの参照は数えない**（`class_exists('X')`、`new $className` のような動的な参照）
 - **trait は具象型として数える**（trait 自体に抽象・具象の概念がないための割り切り）
 - **無名クラスは非対応**（宣言・依存関係のどちらにも数えない）

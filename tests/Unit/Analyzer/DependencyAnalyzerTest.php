@@ -18,6 +18,7 @@ final class DependencyAnalyzerTest extends TestCase
 {
     private const SIMPLE_PROJECT = __DIR__ . '/../../Fixtures/SimpleProject';
     private const BROKEN_PROJECT = __DIR__ . '/../../Fixtures/BrokenProject';
+    private const DOCBLOCK_PROJECT = __DIR__ . '/../../Fixtures/DocblockProject';
 
     /** @var list<string> */
     private array $tempFiles = [];
@@ -125,6 +126,50 @@ final class DependencyAnalyzerTest extends TestCase
 
         $target = $this->findByFqcn($result->classInfos, 'Fixture\\Cases\\Target');
         self::assertSame([], $target->dependencies);
+    }
+
+    // --- docblock からの依存抽出（Phase 7） ---
+
+    // @var / @param（プロモートされたコンストラクタ引数含む）/ @return / array<int, X> 形式から
+    // 依存が拾えること、docblock 内の use文エイリアス（短縮名）が FQCN に解決されることをまとめて確認する。
+    // 実コードの型宣言は一切 Product を参照しないフィクスチャなので、依存は docblock 由来のみ。
+    public function testExtractsDependenciesFromVarParamAndReturnDocblocks(): void
+    {
+        $finder = new SourceFinder();
+        $analyzer = new DependencyAnalyzer();
+        $files = $finder->find([self::DOCBLOCK_PROJECT]);
+
+        $result = $analyzer->analyze($files);
+
+        $order = $this->findByFqcn($result->classInfos, 'Fixture\\DocblockProject\\Domain\\Order');
+        self::assertSame(['Fixture\\DocblockProject\\Domain\\Product'], $order->dependencies);
+    }
+
+    // useDocblock: false を指定すると docblock は一切解析されない
+    public function testUseDocblockFalseDisablesDocblockDependencyCollection(): void
+    {
+        $finder = new SourceFinder();
+        $analyzer = new DependencyAnalyzer(useDocblock: false);
+        $files = $finder->find([self::DOCBLOCK_PROJECT]);
+
+        $result = $analyzer->analyze($files);
+
+        $order = $this->findByFqcn($result->classInfos, 'Fixture\\DocblockProject\\Domain\\Order');
+        self::assertSame([], $order->dependencies);
+    }
+
+    // 壊れた docblock は例外を投げず無視される。実コードの型宣言（Product）は引き続き拾える
+    public function testBrokenDocblockIsIgnoredWithoutCrashing(): void
+    {
+        $finder = new SourceFinder();
+        $analyzer = new DependencyAnalyzer();
+        $files = $finder->find([self::DOCBLOCK_PROJECT]);
+
+        $result = $analyzer->analyze($files);
+
+        self::assertSame([], $result->warnings);
+        $brokenDoc = $this->findByFqcn($result->classInfos, 'Fixture\\DocblockProject\\Domain\\BrokenDoc');
+        self::assertSame(['Fixture\\DocblockProject\\Domain\\Product'], $brokenDoc->dependencies);
     }
 
     // --- 依存抽出（「数えるもの」を1パターンずつ） ---

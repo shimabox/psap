@@ -17,6 +17,7 @@ final class AnalyzeCommandTest extends TestCase
 {
     private const SIMPLE_PROJECT = __DIR__ . '/../Fixtures/SimpleProject';
     private const CYCLIC_PROJECT = __DIR__ . '/../Fixtures/CyclicProject';
+    private const DOCBLOCK_ONLY_PROJECT = __DIR__ . '/../Fixtures/DocblockOnlyProject';
 
     public function testTextFormatRendersTableAndExitsSuccessfully(): void
     {
@@ -202,6 +203,50 @@ final class AnalyzeCommandTest extends TestCase
 
         // ゾーン非該当のコンポーネントでもクラス一覧が出ることを確認する
         self::assertStringContainsString('Classes in', $tester->getDisplay());
+    }
+
+    // docblock（@var）だけで Domain -> Catalog に依存するフィクスチャ。
+    // デフォルト（docblock 解析あり）ではコンポーネント間依存として Ce/Ca にカウントされ、
+    // --no-docblock を指定するとカウントされなくなることを確認する。
+    public function testNoDocblockOptionDisablesDocblockDependencyCollection(): void
+    {
+        $withDocblock = $this->commandTester();
+        $withDocblock->execute([
+            'paths' => [self::DOCBLOCK_ONLY_PROJECT],
+            '--format' => 'json',
+            '--depth' => '3',
+        ]);
+        $decodedWithDocblock = $this->decodeJson($withDocblock->getDisplay());
+        $domainWithDocblock = $this->findComponent($decodedWithDocblock, 'Fixture\\DocblockOnlyProject\\Domain');
+
+        self::assertSame(1, $domainWithDocblock['ce']);
+
+        $withoutDocblock = $this->commandTester();
+        $withoutDocblock->execute([
+            'paths' => [self::DOCBLOCK_ONLY_PROJECT],
+            '--format' => 'json',
+            '--depth' => '3',
+            '--no-docblock' => true,
+        ]);
+        $decodedWithoutDocblock = $this->decodeJson($withoutDocblock->getDisplay());
+        $domainWithoutDocblock = $this->findComponent($decodedWithoutDocblock, 'Fixture\\DocblockOnlyProject\\Domain');
+
+        self::assertSame(0, $domainWithoutDocblock['ce']);
+    }
+
+    /**
+     * @param array{components: list<array{name: string, ce: int, ca: int}>} $decoded
+     * @return array{name: string, ce: int, ca: int}
+     */
+    private function findComponent(array $decoded, string $name): array
+    {
+        foreach ($decoded['components'] as $component) {
+            if ($component['name'] === $name) {
+                return $component;
+            }
+        }
+
+        self::fail(sprintf('コンポーネント %s が見つかりませんでした', $name));
     }
 
     private function commandTester(): CommandTester
