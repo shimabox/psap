@@ -1,0 +1,40 @@
+{
+    "name": "shimabox/bobsap",
+    "description": "A CLI tool that measures dependency management metrics (Stable Abstractions Principle) for PHP codebases.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "nikic/php-parser": "^5",
+        "symfony/console": "^7"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11",
+        "phpstan/phpstan": "^2",
+        "friendsofphp/php-cs-fixer": "^3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bobsap\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Bobsap\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/bobsap"
+    ],
+    "scripts": {
+        "test": "phpunit",
+        "stan": "phpstan analyse",
+        "cs": "php-cs-fixer fix --dry-run --diff",
+        "cs:fix": "php-cs-fixer fix"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

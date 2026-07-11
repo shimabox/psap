@@ -1,0 +1,15 @@
+# 書籍キャプチャ置き場（触れない）
+tmp/
+
+# Composer
+vendor/
+
+# macOS
+.DS_Store
+
+# ツールのキャッシュ
+.php-cs-fixer.cache
+.phpunit.cache/
+
+# ローカル専用の Claude 設定
+.claude/settings.local.json

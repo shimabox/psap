@@ -1,0 +1,9 @@
+# 開発用構成。`docker compose run --rm app <コマンド>` の形で使う。
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    working_dir: /app
+    volumes:
+      - .:/app
