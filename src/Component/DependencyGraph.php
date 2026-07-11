@@ -15,10 +15,12 @@ final readonly class DependencyGraph
     /**
      * @param list<string> $nodes コンポーネント名一覧（ソート済み）
      * @param list<array{0: string, 1: string}> $edges [from, to] のペア一覧（ソート済み・重複なし）
+     * @param list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}> $edgeDetails
      */
     public function __construct(
         public array $nodes,
         public array $edges,
+        public array $edgeDetails = [],
     ) {
     }
 
@@ -30,26 +32,34 @@ final readonly class DependencyGraph
      */
     public static function fromComponents(array $components): self
     {
-        $componentNameByFqcn = self::buildComponentNameMap($components);
+        $classByFqcn = self::buildClassMap($components);
 
         $seenPairs = [];
         $edges = [];
+        /** @var array<string, array<string, array{from: string, to: string}>> $classDependenciesByPair */
+        $classDependenciesByPair = [];
         foreach ($components as $component) {
             $fromName = $component->name;
             foreach ($component->classInfos as $classInfo) {
                 foreach ($classInfo->dependencies as $dependency) {
-                    $toName = $componentNameByFqcn[strtolower($dependency)] ?? null;
-                    if ($toName === null || $toName === $fromName) {
+                    $target = $classByFqcn[strtolower($dependency)] ?? null;
+                    if ($target === null || $target['component'] === $fromName) {
                         continue;
                     }
 
+                    $toName = $target['component'];
                     $pairKey = $fromName . '|' . $toName;
-                    if (isset($seenPairs[$pairKey])) {
-                        continue;
+                    if (!isset($seenPairs[$pairKey])) {
+                        $seenPairs[$pairKey] = true;
+                        $edges[] = [$fromName, $toName];
+                        $classDependenciesByPair[$pairKey] = [];
                     }
-                    $seenPairs[$pairKey] = true;
 
-                    $edges[] = [$fromName, $toName];
+                    $classPairKey = strtolower($classInfo->fqcn) . '|' . strtolower($target['fqcn']);
+                    $classDependenciesByPair[$pairKey][$classPairKey] = [
+                        'from' => $classInfo->fqcn,
+                        'to' => $target['fqcn'],
+                    ];
                 }
             }
         }
@@ -57,24 +67,38 @@ final readonly class DependencyGraph
         // コンポーネント名でソートして順序を安定させる（表示・アルゴリズムどちらの用途でも決定的にするため）
         usort($edges, static fn (array $a, array $b): int => $a <=> $b);
 
+        $edgeDetails = [];
+        foreach ($edges as [$from, $to]) {
+            $classDependencies = array_values($classDependenciesByPair[$from . '|' . $to]);
+            usort($classDependencies, static fn (array $a, array $b): int => $a <=> $b);
+            $edgeDetails[] = [
+                'from' => $from,
+                'to' => $to,
+                'classDependencies' => $classDependencies,
+            ];
+        }
+
         $nodes = array_map(static fn (Component $component): string => $component->name, $components);
         sort($nodes);
 
-        return new self($nodes, $edges);
+        return new self($nodes, $edges, $edgeDetails);
     }
 
     /**
      * クラスの FQCN → 所属コンポーネント名 の対応表を作る（MetricsCalculator と同じ考え方）。
      *
      * @param list<Component> $components
-     * @return array<string, string>
+     * @return array<string, array{component: string, fqcn: string}>
      */
-    private static function buildComponentNameMap(array $components): array
+    private static function buildClassMap(array $components): array
     {
         $map = [];
         foreach ($components as $component) {
             foreach ($component->classInfos as $classInfo) {
-                $map[strtolower($classInfo->fqcn)] = $component->name;
+                $map[strtolower($classInfo->fqcn)] = [
+                    'component' => $component->name,
+                    'fqcn' => $classInfo->fqcn,
+                ];
             }
         }
 

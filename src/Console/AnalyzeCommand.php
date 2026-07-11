@@ -164,9 +164,15 @@ final class AnalyzeCommand extends Command
         $components = (new ComponentClassifier())->classify($analysisResult->classInfos, $depth);
         $componentMetrics = (new MetricsCalculator())->calculate($components);
         $summary = MetricsSummary::from($componentMetrics);
-        $cycles = (new CycleDetector())->detect(DependencyGraph::fromComponents($components));
+        $dependencyGraph = DependencyGraph::fromComponents($components);
+        $cycles = (new CycleDetector())->detect($dependencyGraph);
 
-        $reportData = new ReportData($componentMetrics, $summary, $analysisResult->warnings, $cycles);
+        $warnings = $analysisResult->warnings;
+        if (count($components) === 1 && $this->hasDeeperNamespaces($analysisResult->classInfos, $components[0]->name)) {
+            $warnings[] = 'コンポーネントが1件のみです。より細かく分析する場合は --depth を増やしてください。';
+        }
+
+        $reportData = new ReportData($componentMetrics, $summary, $warnings, $cycles, $dependencyGraph);
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);
 
@@ -201,7 +207,11 @@ final class AnalyzeCommand extends Command
         if ($failOnCycle && $cycles !== []) {
             $errorOutput->writeln('<error>循環依存（ADP違反）が見つかりました:</error>');
             foreach ($cycles as $cycle) {
-                $errorOutput->writeln('  - ' . $this->formatCycle($cycle));
+                $errorOutput->writeln('  - Components: ' . implode(', ', $cycle));
+                $errorOutput->writeln('    Edges:');
+                foreach ($reportData->edgesInCycle($cycle) as [$from, $to]) {
+                    $errorOutput->writeln(sprintf('      %s -> %s', $from, $to));
+                }
             }
 
             return Command::FAILURE;
@@ -211,18 +221,24 @@ final class AnalyzeCommand extends Command
     }
 
     /**
-     * 循環1件分の表示行を作る（TextReporter::cycleLine と同じ規則）。
-     * 2ノードは `<->`、3ノード以上は先頭に戻る `->` チェーンで表す。
-     *
-     * @param list<string> $cycle
+     * @param list<\Bobsap\Analyzer\ClassInfo> $classInfos
      */
-    private function formatCycle(array $cycle): string
+    private function hasDeeperNamespaces(array $classInfos, string $componentName): bool
     {
-        if (count($cycle) === 2) {
-            return sprintf('%s <-> %s', $cycle[0], $cycle[1]);
+        $prefix = $componentName . '\\';
+        foreach ($classInfos as $classInfo) {
+            $namespaceEnd = strrpos($classInfo->fqcn, '\\');
+            if ($namespaceEnd === false) {
+                continue;
+            }
+
+            $namespace = substr($classInfo->fqcn, 0, $namespaceEnd);
+            if (str_starts_with($namespace, $prefix)) {
+                return true;
+            }
         }
 
-        return implode(' -> ', $cycle) . ' -> ' . $cycle[0];
+        return false;
     }
 
     /**

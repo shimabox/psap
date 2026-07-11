@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Bobsap\Report;
 
-use Bobsap\Component\Component;
-use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\Zone;
 
@@ -43,7 +41,7 @@ final class PlantUmlReporter implements ReporterInterface
             $lines[] = $this->nodeLine($metrics, $nodeIdByComponentName[$metrics->component->name]);
         }
 
-        $graph = DependencyGraph::fromComponents($this->components($data->componentMetrics));
+        $graph = $data->dependencyGraph;
         foreach ($graph->edges as [$from, $to]) {
             $lines[] = $this->edgeLine(
                 $nodeIdByComponentName[$from],
@@ -83,18 +81,6 @@ final class PlantUmlReporter implements ReporterInterface
         }
 
         return $map;
-    }
-
-    /**
-     * @param list<ComponentMetrics> $componentMetrics
-     * @return list<Component>
-     */
-    private function components(array $componentMetrics): array
-    {
-        return array_map(
-            static fn (ComponentMetrics $metrics): Component => $metrics->component,
-            $componentMetrics,
-        );
     }
 
     private function nodeLine(ComponentMetrics $metrics, string $nodeId): string

@@ -40,6 +40,7 @@ final class AnalyzeCommandTest extends TestCase
         $decoded = $this->decodeJson($tester->getDisplay());
         self::assertArrayHasKey('summary', $decoded);
         self::assertArrayHasKey('components', $decoded);
+        self::assertArrayHasKey('dependencies', $decoded);
         self::assertArrayHasKey('warnings', $decoded);
         self::assertGreaterThan(0, $decoded['summary']['componentCount']);
     }
@@ -175,6 +176,19 @@ final class AnalyzeCommandTest extends TestCase
         $decoded = $this->decodeJson($tester->getDisplay());
 
         self::assertNotEmpty($decoded['cycles']);
+        self::assertNotEmpty($decoded['dependencies']);
+        self::assertNotEmpty($decoded['dependencies'][0]['classDependencies']);
+    }
+
+    public function testWarnsWhenDepthCollapsesDeeperNamespacesIntoOneComponent(): void
+    {
+        $tester = $this->commandTester();
+        $tester->execute(['paths' => [self::DOCBLOCK_ONLY_PROJECT], '--depth' => '1', '--format' => 'json']);
+
+        $decoded = $this->decodeJson($tester->getDisplay());
+
+        self::assertCount(1, $decoded['components']);
+        self::assertStringContainsString('--depth を増やしてください', $decoded['warnings'][0]);
     }
 
     public function testOutputOptionWritesToFileInsteadOfStdout(): void
@@ -310,6 +324,7 @@ final class AnalyzeCommandTest extends TestCase
      *         zone: string|null,
      *         classes: list<array{fqcn: string, kind: string}>,
      *     }>,
+     *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
      *     cycles: list<list<string>>,
      *     warnings: list<string>,
      * }
@@ -330,6 +345,7 @@ final class AnalyzeCommandTest extends TestCase
          *         zone: string|null,
          *         classes: list<array{fqcn: string, kind: string}>,
          *     }>,
+         *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
          *     cycles: list<list<string>>,
          *     warnings: list<string>,
          * } $decoded

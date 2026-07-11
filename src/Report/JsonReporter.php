@@ -28,6 +28,7 @@ final class JsonReporter implements ReporterInterface
                 'varianceDistance' => round($data->summary->varianceDistance, self::ROUND_PRECISION),
             ],
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
+            'dependencies' => $data->dependencyGraph->edgeDetails,
             'cycles' => $data->cycles,
             'warnings' => $data->warnings,
         ];

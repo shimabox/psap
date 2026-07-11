@@ -41,6 +41,17 @@ final class DependencyGraphTest extends TestCase
         $graph = DependencyGraph::fromComponents([$domain, $infra]);
 
         self::assertSame([['App\\Domain', 'App\\Infra']], $graph->edges);
+        self::assertSame(
+            [[
+                'from' => 'App\\Domain',
+                'to' => 'App\\Infra',
+                'classDependencies' => [
+                    ['from' => 'App\\Domain\\Order', 'to' => 'App\\Infra\\UserRepository'],
+                    ['from' => 'App\\Domain\\User', 'to' => 'App\\Infra\\UserRepository'],
+                ],
+            ]],
+            $graph->edgeDetails,
+        );
     }
 
     public function testIgnoresDependenciesOutsideAnalyzedComponents(): void

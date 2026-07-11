@@ -7,6 +7,7 @@ namespace Bobsap\Tests\Unit\Report;
 use Bobsap\Analyzer\ClassInfo;
 use Bobsap\Analyzer\TypeKind;
 use Bobsap\Component\Component;
+use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\MetricsSummary;
 use Bobsap\Metrics\Zone;
@@ -90,6 +91,27 @@ final class JsonReporterTest extends TestCase
         self::assertSame([['App\\Domain', 'App\\Infra']], $decoded['cycles']);
     }
 
+    public function testEncodesDependencyEdgesWithClassEvidence(): void
+    {
+        $graph = new DependencyGraph(
+            ['App\\Domain', 'App\\Infra'],
+            [['App\\Domain', 'App\\Infra']],
+            [[
+                'from' => 'App\\Domain',
+                'to' => 'App\\Infra',
+                'classDependencies' => [[
+                    'from' => 'App\\Domain\\User',
+                    'to' => 'App\\Infra\\UserRepository',
+                ]],
+            ]],
+        );
+        $data = new ReportData([], MetricsSummary::from([]), [], [], $graph);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertSame($graph->edgeDetails, $decoded['dependencies']);
+    }
+
     public function testEncodesEmptyCyclesArrayWhenNoCyclesExist(): void
     {
         $data = new ReportData([], MetricsSummary::from([]), []);
@@ -138,6 +160,7 @@ final class JsonReporterTest extends TestCase
      *         zone: string|null,
      *         classes: list<array{fqcn: string, kind: string}>,
      *     }>,
+     *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
      *     cycles: list<list<string>>,
      *     warnings: list<string>,
      * }
@@ -158,6 +181,7 @@ final class JsonReporterTest extends TestCase
          *         zone: string|null,
          *         classes: list<array{fqcn: string, kind: string}>,
          *     }>,
+         *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
          *     cycles: list<list<string>>,
          *     warnings: list<string>,
          * } $decoded

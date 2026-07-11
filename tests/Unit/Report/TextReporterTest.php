@@ -7,6 +7,7 @@ namespace Bobsap\Tests\Unit\Report;
 use Bobsap\Analyzer\ClassInfo;
 use Bobsap\Analyzer\TypeKind;
 use Bobsap\Component\Component;
+use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\MetricsSummary;
 use Bobsap\Metrics\Zone;
@@ -144,12 +145,18 @@ final class TextReporterTest extends TestCase
             $this->metrics('App\\Domain', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
             $this->metrics('App\\Infra', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
         ];
-        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\Domain', 'App\\Infra']]);
+        $graph = new DependencyGraph(
+            ['App\\Domain', 'App\\Infra'],
+            [['App\\Domain', 'App\\Infra'], ['App\\Infra', 'App\\Domain']],
+        );
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\Domain', 'App\\Infra']], $graph);
 
         $output = (new TextReporter())->render($data);
 
         self::assertStringContainsString('Cycles (ADP violation):', $output);
-        self::assertStringContainsString('App\\Domain <-> App\\Infra', $output);
+        self::assertStringContainsString('Components: App\\Domain, App\\Infra', $output);
+        self::assertStringContainsString('App\\Domain -> App\\Infra', $output);
+        self::assertStringContainsString('App\\Infra -> App\\Domain', $output);
         // 統計行の後にセクションが出ること
         $statisticsPosition = strpos($output, 'Statistics: mean(D)=');
         $cyclesPosition = strpos($output, 'Cycles (ADP violation):');
@@ -158,18 +165,27 @@ final class TextReporterTest extends TestCase
         self::assertGreaterThan($statisticsPosition, $cyclesPosition);
     }
 
-    public function testRendersChainNotationForCyclesWithThreeOrMoreNodes(): void
+    public function testRendersOnlyActualEdgesForCyclesWithThreeOrMoreNodes(): void
     {
         $metrics = [
             $this->metrics('App\\A', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
             $this->metrics('App\\B', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
             $this->metrics('App\\C', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
         ];
-        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\A', 'App\\B', 'App\\C']]);
+        $graph = new DependencyGraph(
+            ['App\\A', 'App\\B', 'App\\C'],
+            [['App\\A', 'App\\B'], ['App\\A', 'App\\C'], ['App\\B', 'App\\A'], ['App\\C', 'App\\A']],
+        );
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\A', 'App\\B', 'App\\C']], $graph);
 
         $output = (new TextReporter())->render($data);
 
-        self::assertStringContainsString('App\\A -> App\\B -> App\\C -> App\\A', $output);
+        self::assertStringContainsString('Components: App\\A, App\\B, App\\C', $output);
+        self::assertStringContainsString('App\\A -> App\\B', $output);
+        self::assertStringContainsString('App\\A -> App\\C', $output);
+        self::assertStringContainsString('App\\B -> App\\A', $output);
+        self::assertStringContainsString('App\\C -> App\\A', $output);
+        self::assertStringNotContainsString('App\\B -> App\\C', $output);
     }
 
     public function testOmitsCyclesSectionWhenNoCyclesExist(): void
