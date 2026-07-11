@@ -77,6 +77,29 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertSame([], $helper->dependencies);
     }
 
+    public function testMergesConditionalDeclarationsWithTheSameFqcn(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace Fixture\Cases;
+            class FirstDependency {}
+            class SecondDependency {}
+            if (PHP_VERSION_ID >= 80000) {
+                trait CompatibleTrait { private FirstDependency $first; }
+            } else {
+                trait CompatibleTrait { private SecondDependency $second; }
+            }
+            PHP;
+
+        $result = $this->analyzeCode($code);
+
+        self::assertCount(3, $result->classInfos);
+        self::assertSame(
+            ['Fixture\\Cases\\FirstDependency', 'Fixture\\Cases\\SecondDependency'],
+            $this->findByFqcn($result->classInfos, 'Fixture\\Cases\\CompatibleTrait')->dependencies,
+        );
+    }
+
     // --- パースエラーのファイルは例外を投げずスキップし、警告として収集する ---
 
     public function testParseErrorIsCollectedAsWarningAndSkipped(): void
@@ -207,6 +230,27 @@ final class DependencyAnalyzerTest extends TestCase
 
         $order = $this->findByFqcn($result->classInfos, 'Fixture\\DocblockProject\\Domain\\Order');
         self::assertSame([], $order->dependencies);
+    }
+
+    public function testExtractsThrowsDependencyFromMethodDocblock(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace Fixture\Cases;
+            class DomainFailure extends \RuntimeException {}
+            class Target
+            {
+                /** @throws DomainFailure */
+                public function execute(): void {}
+            }
+            PHP;
+
+        $result = $this->analyzeCode($code);
+
+        self::assertSame(
+            ['Fixture\\Cases\\DomainFailure'],
+            $this->findByFqcn($result->classInfos, 'Fixture\\Cases\\Target')->dependencies,
+        );
     }
 
     // 壊れた docblock は例外を投げず無視される。実コードの型宣言（Product）は引き続き拾える

@@ -27,7 +27,7 @@ use PhpParser\ParserFactory;
  * 「解析対象外への依存を無視する」判断は Phase 2（メトリクス計算）の責務。
  *
  * $useDocblock（デフォルト true）を有効にすると、プロパティの `@var` とメソッドの
- * `@param` / `@return` からもクラス名候補を収集する（`--no-docblock` で無効化できる）。
+     * `@param` / `@return` / `@throws` からもクラス名候補を収集する（`--no-docblock` で無効化できる）。
  * 短縮名の解決には NameResolver が保持する NameContext をそのまま使う。
  */
 final class DependencyAnalyzer
@@ -85,7 +85,47 @@ final class DependencyAnalyzer
             }
         }
 
-        return new AnalysisResult($classInfos, $warnings);
+        [$classInfos, $duplicateWarnings] = $this->mergeDuplicateDeclarations($classInfos);
+
+        return new AnalysisResult($classInfos, [...$warnings, ...$duplicateWarnings]);
+    }
+
+    /**
+     * 条件分岐による互換実装など、同じFQCNを持つ宣言を1型へまとめる。
+     *
+     * @param list<ClassInfo> $classInfos
+     * @return array{list<ClassInfo>, list<string>}
+     */
+    private function mergeDuplicateDeclarations(array $classInfos): array
+    {
+        /** @var array<string, ClassInfo> $mergedByFqcn */
+        $mergedByFqcn = [];
+        $warnings = [];
+
+        foreach ($classInfos as $classInfo) {
+            $key = strtolower($classInfo->fqcn);
+            $existing = $mergedByFqcn[$key] ?? null;
+            if ($existing === null) {
+                $mergedByFqcn[$key] = $classInfo;
+
+                continue;
+            }
+
+            if ($existing->kind !== $classInfo->kind) {
+                $warnings[] = sprintf('同じFQCNに異なる型種別の宣言があります: %s', $existing->fqcn);
+            } elseif ($existing->filePath !== $classInfo->filePath) {
+                $warnings[] = sprintf('複数ファイルに同じFQCNの宣言があるため統合しました: %s', $existing->fqcn);
+            }
+
+            $mergedByFqcn[$key] = new ClassInfo(
+                fqcn: $existing->fqcn,
+                kind: $existing->kind,
+                filePath: $existing->filePath,
+                dependencies: [...$existing->dependencies, ...$classInfo->dependencies],
+            );
+        }
+
+        return [array_values($mergedByFqcn), $warnings];
     }
 
     /**

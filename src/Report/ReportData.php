@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bobsap\Report;
 
 use Bobsap\Component\Component;
+use Bobsap\Component\CyclePathFinder;
 use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\MetricsSummary;
@@ -19,6 +20,9 @@ final readonly class ReportData
 {
     public DependencyGraph $dependencyGraph;
 
+    /** @var list<list<string>> 始点を末尾にも含む代表循環経路 */
+    public array $cyclePaths;
+
     /**
      * @param list<ComponentMetrics> $componentMetrics
      * @param list<string> $warnings Analyzer が発したパース警告等
@@ -30,12 +34,14 @@ final readonly class ReportData
         public array $warnings,
         public array $cycles = [],
         ?DependencyGraph $dependencyGraph = null,
+        public ?int $namespaceDepth = null,
     ) {
         $components = array_map(
             static fn (ComponentMetrics $metrics): Component => $metrics->component,
             $componentMetrics,
         );
         $this->dependencyGraph = $dependencyGraph ?? DependencyGraph::fromComponents($components);
+        $this->cyclePaths = (new CyclePathFinder())->find($this->dependencyGraph, $cycles);
     }
 
     /**
@@ -48,5 +54,55 @@ final readonly class ReportData
             $this->dependencyGraph->edges,
             static fn (array $edge): bool => in_array($edge[0], $cycle, true) && in_array($edge[1], $cycle, true),
         ));
+    }
+
+    /**
+     * @return list<array{
+     *     path: list<string>,
+     *     dependencies: list<array{
+     *         from: string,
+     *         to: string,
+     *         classDependencies: list<array{from: string, to: string}>,
+     *     }>,
+     * }>
+     */
+    public function cyclePathDetails(): array
+    {
+        return array_map(
+            fn (array $path): array => [
+                'path' => $path,
+                'dependencies' => $this->dependenciesInPath($path),
+            ],
+            $this->cyclePaths,
+        );
+    }
+
+    /**
+     * @param list<string> $path
+     * @return list<array{
+     *     from: string,
+     *     to: string,
+     *     classDependencies: list<array{from: string, to: string}>,
+     * }>
+     */
+    private function dependenciesInPath(array $path): array
+    {
+        $detailsByEdge = [];
+        foreach ($this->dependencyGraph->edgeDetails as $detail) {
+            $detailsByEdge[$detail['from'] . "\0" . $detail['to']] = $detail;
+        }
+
+        $dependencies = [];
+        for ($index = 0; isset($path[$index + 1]); $index++) {
+            $from = $path[$index];
+            $to = $path[$index + 1];
+            $dependencies[] = $detailsByEdge[$from . "\0" . $to] ?? [
+                'from' => $from,
+                'to' => $to,
+                'classDependencies' => [],
+            ];
+        }
+
+        return $dependencies;
     }
 }

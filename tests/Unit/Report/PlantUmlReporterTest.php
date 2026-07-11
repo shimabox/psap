@@ -104,7 +104,7 @@ final class PlantUmlReporterTest extends TestCase
         self::assertStringContainsString('Pain Zone = #FFCCCC', $output);
         self::assertStringContainsString('Useless Zone = #FFF2CC', $output);
         self::assertStringContainsString('Normal = no color', $output);
-        self::assertStringContainsString('Red edge = dependency cycle (ADP violation)', $output);
+        self::assertStringContainsString('Red edge = shortest cycle path (ADP violation)', $output);
     }
 
     // エッジ導出（集約・対象外依存の無視・コンポーネント内依存の無視）のテストは
@@ -150,6 +150,28 @@ final class PlantUmlReporterTest extends TestCase
         self::assertStringContainsString('C2 -[#red,thickness=2]-> C1', $output);
         self::assertStringNotContainsString('C1 --> C2', $output);
         self::assertStringNotContainsString('C2 --> C1', $output);
+    }
+
+    public function testColorsOnlyEdgesInRepresentativeCyclePath(): void
+    {
+        $classes = [
+            new ClassInfo('App\\A\\X', TypeKind::ConcreteClass, '/dummy.php', ['App\\B\\X', 'App\\C\\X']),
+            new ClassInfo('App\\B\\X', TypeKind::ConcreteClass, '/dummy.php', ['App\\A\\X']),
+            new ClassInfo('App\\C\\X', TypeKind::ConcreteClass, '/dummy.php', ['App\\A\\X']),
+        ];
+        $metrics = [
+            $this->metrics('App\\A', ca: 2, ce: 2, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None, classInfos: [$classes[0]]),
+            $this->metrics('App\\B', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None, classInfos: [$classes[1]]),
+            $this->metrics('App\\C', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None, classInfos: [$classes[2]]),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\A', 'App\\B', 'App\\C']]);
+
+        $output = (new PlantUmlReporter())->render($data);
+
+        self::assertStringContainsString('C1 -[#red,thickness=2]-> C2', $output);
+        self::assertStringContainsString('C2 -[#red,thickness=2]-> C1', $output);
+        self::assertStringContainsString('C1 --> C3', $output);
+        self::assertStringContainsString('C3 --> C1', $output);
     }
 
     public function testDoesNotColorEdgesOutsideCycle(): void

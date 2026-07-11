@@ -7,6 +7,7 @@ namespace Bobsap\Console;
 use Bobsap\Analyzer\DependencyAnalyzer;
 use Bobsap\Analyzer\SourceFinder;
 use Bobsap\Component\ComponentClassifier;
+use Bobsap\Component\ComponentDepthResolver;
 use Bobsap\Component\CycleDetector;
 use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
@@ -53,8 +54,8 @@ final class AnalyzeCommand extends Command
                 'depth',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'コンポーネントに束ねる名前空間の深さ',
-                '2',
+                'コンポーネントに束ねる名前空間の深さ（auto または1以上の整数）',
+                'auto',
             )
             ->addOption(
                 'format',
@@ -91,7 +92,7 @@ final class AnalyzeCommand extends Command
                 'no-docblock',
                 null,
                 InputOption::VALUE_NONE,
-                'docblock（@var / @param / @return）からの依存抽出を無効にする',
+                'docblock（@var / @param / @return / @throws）からの依存抽出を無効にする',
             );
     }
 
@@ -123,9 +124,11 @@ final class AnalyzeCommand extends Command
 
         /** @var string $depthOption */
         $depthOption = $input->getOption('depth');
-        $depth = filter_var($depthOption, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $depth = $depthOption === 'auto'
+            ? null
+            : filter_var($depthOption, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($depth === false) {
-            $errorOutput->writeln(sprintf('<error>--depth には1以上の整数を指定してください: %s</error>', $depthOption));
+            $errorOutput->writeln(sprintf('<error>--depth には auto または1以上の整数を指定してください: %s</error>', $depthOption));
 
             return Command::INVALID;
         }
@@ -161,6 +164,7 @@ final class AnalyzeCommand extends Command
             return Command::INVALID;
         }
         $analysisResult = (new DependencyAnalyzer(useDocblock: !$noDocblock))->analyze($files);
+        $depth ??= (new ComponentDepthResolver())->resolve($analysisResult->classInfos);
         $components = (new ComponentClassifier())->classify($analysisResult->classInfos, $depth);
         $componentMetrics = (new MetricsCalculator())->calculate($components);
         $summary = MetricsSummary::from($componentMetrics);
@@ -168,11 +172,13 @@ final class AnalyzeCommand extends Command
         $cycles = (new CycleDetector())->detect($dependencyGraph);
 
         $warnings = $analysisResult->warnings;
-        if (count($components) === 1 && $this->hasDeeperNamespaces($analysisResult->classInfos, $components[0]->name)) {
-            $warnings[] = 'コンポーネントが1件のみです。より細かく分析する場合は --depth を増やしてください。';
+        if (count($components) === 1) {
+            $warnings[] = $this->hasDeeperNamespaces($analysisResult->classInfos, $components[0]->name)
+                ? 'コンポーネントが1件のみです。より細かく分析する場合は --depth を増やしてください。'
+                : 'コンポーネントが1件のみのため、コンポーネント間のCa、Ce、循環依存は評価できません。';
         }
 
-        $reportData = new ReportData($componentMetrics, $summary, $warnings, $cycles, $dependencyGraph);
+        $reportData = new ReportData($componentMetrics, $summary, $warnings, $cycles, $dependencyGraph, $depth);
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);
 
@@ -206,12 +212,8 @@ final class AnalyzeCommand extends Command
 
         if ($failOnCycle && $cycles !== []) {
             $errorOutput->writeln('<error>循環依存（ADP違反）が見つかりました:</error>');
-            foreach ($cycles as $cycle) {
-                $errorOutput->writeln('  - Components: ' . implode(', ', $cycle));
-                $errorOutput->writeln('    Edges:');
-                foreach ($reportData->edgesInCycle($cycle) as [$from, $to]) {
-                    $errorOutput->writeln(sprintf('      %s -> %s', $from, $to));
-                }
+            foreach ($reportData->cyclePaths as $path) {
+                $errorOutput->writeln('  - Path: ' . implode(' -> ', $path));
             }
 
             return Command::FAILURE;

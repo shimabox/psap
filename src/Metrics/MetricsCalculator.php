@@ -68,6 +68,9 @@ final class MetricsCalculator
         $abstractness = $totalTypeCount === 0 ? 0.0 : $abstractTypeCount / $totalTypeCount;
 
         $distance = abs($abstractness + $instability - 1.0);
+        $zone = ($ca + $ce) === 0
+            ? Zone::None
+            : Zone::determine($instability, $abstractness);
 
         return new ComponentMetrics(
             component: $component,
@@ -76,7 +79,7 @@ final class MetricsCalculator
             instability: $instability,
             abstractness: $abstractness,
             distance: $distance,
-            zone: Zone::determine($instability, $abstractness),
+            zone: $zone,
         );
     }
 

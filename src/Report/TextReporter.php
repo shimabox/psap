@@ -16,6 +16,8 @@ use Bobsap\Metrics\Zone;
  */
 final class TextReporter implements ReporterInterface
 {
+    private const int CYCLE_EVIDENCE_LIMIT = 3;
+
     /** ゾーン警告なしの通常行に合わせて数値列の幅を揃えるための最小幅（"0.00" 形式は常に4桁） */
     private const int DECIMAL_COLUMN_WIDTH = 4;
 
@@ -31,6 +33,9 @@ final class TextReporter implements ReporterInterface
     {
         $lines = [];
         $lines[] = 'bobsap - Stable Abstractions Principle metrics';
+        if ($data->namespaceDepth !== null) {
+            $lines[] = sprintf('Namespace depth: %d', $data->namespaceDepth);
+        }
         $lines[] = '';
 
         $widths = $this->calculateColumnWidths($data->componentMetrics);
@@ -51,11 +56,20 @@ final class TextReporter implements ReporterInterface
         if ($data->cycles !== []) {
             $lines[] = '';
             $lines[] = 'Cycles (ADP violation):';
-            foreach ($data->cycles as $cycle) {
-                $lines[] = '  - Components: ' . implode(', ', $cycle);
-                $lines[] = '    Edges:';
-                foreach ($data->edgesInCycle($cycle) as [$from, $to]) {
-                    $lines[] = sprintf('      %s -> %s', $from, $to);
+            foreach ($data->cyclePathDetails() as $cycle) {
+                $lines[] = '  - Path: ' . implode(' -> ', $cycle['path']);
+                $lines[] = '    Dependency evidence:';
+                foreach ($cycle['dependencies'] as $dependency) {
+                    $lines[] = sprintf('      %s -> %s', $dependency['from'], $dependency['to']);
+                    $visibleEvidence = array_slice($dependency['classDependencies'], 0, self::CYCLE_EVIDENCE_LIMIT);
+                    foreach ($visibleEvidence as $evidence) {
+                        $lines[] = sprintf('        - %s -> %s', $evidence['from'], $evidence['to']);
+                    }
+
+                    $remaining = count($dependency['classDependencies']) - count($visibleEvidence);
+                    if ($remaining > 0) {
+                        $lines[] = sprintf('        - ... and %d more', $remaining);
+                    }
                 }
             }
         }

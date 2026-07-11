@@ -24,12 +24,14 @@ final class JsonReporter implements ReporterInterface
         $payload = [
             'summary' => [
                 'componentCount' => count($data->componentMetrics),
+                'namespaceDepth' => $data->namespaceDepth,
                 'meanDistance' => round($data->summary->meanDistance, self::ROUND_PRECISION),
                 'varianceDistance' => round($data->summary->varianceDistance, self::ROUND_PRECISION),
             ],
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
             'dependencies' => $data->dependencyGraph->edgeDetails,
             'cycles' => $data->cycles,
+            'cyclePaths' => $data->cyclePathDetails(),
             'warnings' => $data->warnings,
         ];
 

@@ -53,6 +53,8 @@ PHP 8.5以降が必要です。
 
 `interface`と`abstract class`を抽象型として数えます。`class`、`enum`、`trait`は具象型です。
 
+CaとCeがどちらも0のコンポーネントには、苦痛ゾーンや無駄ゾーンの判定を付けません。
+
 コンポーネントは名前空間単位です。`--depth 2`の場合、`App\Domain\Model\User`は`App\Domain`に属します。解析対象外のクラスへの依存はCaとCeに含めません。
 
 ## 使い方
@@ -63,7 +65,7 @@ bobsap analyze <paths>... [options]
 
 | オプション | 説明 | 初期値 |
 |---|---|---|
-| `--depth` | 名前空間を束ねる深さ | `2` |
+| `--depth` | 名前空間を束ねる深さ。`auto`または1以上の整数 | `auto` |
 | `--format` | `text`、`json`、`mermaid`、`plantuml` | `text` |
 | `--output` | 出力先ファイル | 標準出力 |
 | `--exclude` | fnmatch形式の除外パターン。複数指定可 | なし |
@@ -100,11 +102,11 @@ App\Infrastructure      4   0   3  1.00  0.00  0.00
 Statistics: mean(D)=0.25, variance(D)=0.06
 ```
 
-`-v`を付けると、各コンポーネントに属するクラスも表示します。JSONにはコンポーネント間の依存と、その根拠になるクラス間依存も含まれます。
+`-v`を付けると、各コンポーネントに属するクラスも表示します。循環依存は実際に一周する最短経路とクラス間依存の根拠を表示します。JSONにはコンポーネント間の依存、循環経路、クラス間依存が含まれます。
 
 MermaidはIとAの散布図を生成します。依存エッジや循環依存を図示する場合はPlantUMLを使ってください。
 
-解析結果が1コンポーネントにまとまり、より深い名前空間がある場合は`--depth`の見直しを促す警告が出ます。
+`auto`は共通名前空間の次の階層を選びます。解析結果が1コンポーネントだけの場合は、コンポーネント間の指標を評価できないことを警告します。より深い名前空間があれば`--depth`の見直しも案内します。
 
 ```bash
 bobsap analyze src/ --format json --output report.json
@@ -122,7 +124,7 @@ ASTから次の参照を抽出します。
 - `new`、静的呼び出し、クラス定数
 - `instanceof`、`catch`
 - PHP Attribute
-- `@var`、`@param`、`@return`
+- `@var`、`@param`、`@return`、`@throws`
 
 docblockでは配列、generic、union、intersection、nullable型を分解し、`use`と名前空間を使ってクラス名を解決します。壊れたdocblockは無視されます。
 

@@ -12,7 +12,7 @@ use Bobsap\Metrics\Zone;
  *
  * ノード = コンポーネント（ラベルに I/A/D を併記し、ゾーンごとに色分け）。
  * エッジ = コンポーネント間の依存（DependencyGraph が集約・重複排除したもの）。
- * 循環依存（ADP違反）に含まれるエッジは赤色の太線で強調する。
+ * 循環依存（ADP違反）ごとの最短経路に含まれるエッジは赤色の太線で強調する。
  */
 final class PlantUmlReporter implements ReporterInterface
 {
@@ -46,7 +46,7 @@ final class PlantUmlReporter implements ReporterInterface
             $lines[] = $this->edgeLine(
                 $nodeIdByComponentName[$from],
                 $nodeIdByComponentName[$to],
-                $this->isCycleEdge($from, $to, $data->cycles),
+                $this->isCycleEdge($from, $to, $data->cyclePaths),
             );
         }
 
@@ -57,7 +57,7 @@ final class PlantUmlReporter implements ReporterInterface
         $lines[] = '  Pain Zone = ' . self::PAIN_COLOR;
         $lines[] = '  Useless Zone = ' . self::USELESS_COLOR;
         $lines[] = '  Normal = no color';
-        $lines[] = '  Red edge = dependency cycle (ADP violation)';
+        $lines[] = '  Red edge = shortest cycle path (ADP violation)';
         $lines[] = 'endlegend';
         $lines[] = '@enduml';
 
@@ -120,15 +120,17 @@ final class PlantUmlReporter implements ReporterInterface
     }
 
     /**
-     * エッジ (from, to) が循環（同じ SCC）に含まれるかどうか。
+     * エッジ (from, to) が表示対象の代表循環経路に含まれるかどうか。
      *
-     * @param list<list<string>> $cycles
+     * @param list<list<string>> $cyclePaths
      */
-    private function isCycleEdge(string $from, string $to, array $cycles): bool
+    private function isCycleEdge(string $from, string $to, array $cyclePaths): bool
     {
-        foreach ($cycles as $cycle) {
-            if (in_array($from, $cycle, true) && in_array($to, $cycle, true)) {
-                return true;
+        foreach ($cyclePaths as $path) {
+            for ($index = 0; isset($path[$index + 1]); $index++) {
+                if ($path[$index] === $from && $path[$index + 1] === $to) {
+                    return true;
+                }
             }
         }
 

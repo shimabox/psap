@@ -18,6 +18,7 @@ final class AnalyzeCommandTest extends TestCase
     private const SIMPLE_PROJECT = __DIR__ . '/../Fixtures/SimpleProject';
     private const CYCLIC_PROJECT = __DIR__ . '/../Fixtures/CyclicProject';
     private const DOCBLOCK_ONLY_PROJECT = __DIR__ . '/../Fixtures/DocblockOnlyProject';
+    private const BROKEN_PROJECT = __DIR__ . '/../Fixtures/BrokenProject';
 
     public function testTextFormatRendersTableAndExitsSuccessfully(): void
     {
@@ -56,8 +57,7 @@ final class AnalyzeCommandTest extends TestCase
         self::assertStringContainsString('quadrantChart', $display);
         self::assertStringContainsString('quadrant-1 Useless Zone', $display);
         self::assertStringContainsString('quadrant-3 Pain Zone', $display);
-        // フィクスチャの Fixture\App コンポーネントの点が出力されている
-        self::assertStringContainsString('"Fixture\\App (D=', $display);
+        self::assertStringContainsString('"Fixture\\App\\Domain (D=', $display);
     }
 
     public function testPlantUmlFormatRendersDependencyGraph(): void
@@ -70,7 +70,7 @@ final class AnalyzeCommandTest extends TestCase
         $display = $tester->getDisplay();
         self::assertStringContainsString('@startuml', $display);
         self::assertStringContainsString('@enduml', $display);
-        self::assertStringContainsString('rectangle "Fixture\\\\App\\n', $display);
+        self::assertStringContainsString('rectangle "Fixture\\\\App\\\\Domain\\n', $display);
         self::assertStringContainsString('legend right', $display);
     }
 
@@ -129,6 +129,17 @@ final class AnalyzeCommandTest extends TestCase
         self::assertStringContainsString('--depth', $tester->getErrorOutput());
     }
 
+    public function testAutoDepthUsesTheLevelBelowTheCommonNamespace(): void
+    {
+        $tester = $this->commandTester();
+        $tester->execute(['paths' => [self::DOCBLOCK_ONLY_PROJECT], '--format' => 'json']);
+
+        $decoded = $this->decodeJson($tester->getDisplay());
+
+        self::assertSame(3, $decoded['summary']['namespaceDepth']);
+        self::assertCount(2, $decoded['components']);
+    }
+
     public function testInvalidThresholdExitsWithInputErrorCode(): void
     {
         $tester = $this->commandTester();
@@ -154,6 +165,10 @@ final class AnalyzeCommandTest extends TestCase
 
         self::assertSame(Command::FAILURE, $tester->getStatusCode());
         self::assertStringContainsString('循環依存', $tester->getErrorOutput());
+        self::assertStringContainsString(
+            'Path: Fixture\\Cyclic\\A -> Fixture\\Cyclic\\B -> Fixture\\Cyclic\\A',
+            $tester->getErrorOutput(),
+        );
     }
 
     public function testFailOnCycleExitsSuccessfullyWhenNoCyclesExist(): void
@@ -176,6 +191,12 @@ final class AnalyzeCommandTest extends TestCase
         $decoded = $this->decodeJson($tester->getDisplay());
 
         self::assertNotEmpty($decoded['cycles']);
+        self::assertNotEmpty($decoded['cyclePaths']);
+        $path = $decoded['cyclePaths'][0]['path'];
+        if ($path === []) {
+            self::fail('循環経路が空です。');
+        }
+        self::assertSame($path[0], array_last($path));
         self::assertNotEmpty($decoded['dependencies']);
         self::assertNotEmpty($decoded['dependencies'][0]['classDependencies']);
     }
@@ -189,6 +210,20 @@ final class AnalyzeCommandTest extends TestCase
 
         self::assertCount(1, $decoded['components']);
         self::assertStringContainsString('--depth を増やしてください', $decoded['warnings'][0]);
+    }
+
+    public function testWarnsWhenProjectHasOnlyOneIndivisibleComponent(): void
+    {
+        $tester = $this->commandTester();
+        $tester->execute(['paths' => [self::BROKEN_PROJECT], '--format' => 'json']);
+
+        $decoded = $this->decodeJson($tester->getDisplay());
+
+        self::assertCount(1, $decoded['components']);
+        self::assertStringContainsString(
+            'コンポーネント間のCa、Ce、循環依存は評価できません',
+            implode("\n", $decoded['warnings']),
+        );
     }
 
     public function testOutputOptionWritesToFileInsteadOfStdout(): void
@@ -312,7 +347,7 @@ final class AnalyzeCommandTest extends TestCase
 
     /**
      * @return array{
-     *     summary: array{componentCount: int, meanDistance: float, varianceDistance: float},
+     *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
      *     components: list<array{
      *         name: string,
      *         classCount: int,
@@ -326,6 +361,7 @@ final class AnalyzeCommandTest extends TestCase
      *     }>,
      *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
      *     cycles: list<list<string>>,
+     *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
      *     warnings: list<string>,
      * }
      */
@@ -333,7 +369,7 @@ final class AnalyzeCommandTest extends TestCase
     {
         /**
          * @var array{
-         *     summary: array{componentCount: int, meanDistance: float, varianceDistance: float},
+         *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
          *     components: list<array{
          *         name: string,
          *         classCount: int,
@@ -347,6 +383,7 @@ final class AnalyzeCommandTest extends TestCase
          *     }>,
          *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
          *     cycles: list<list<string>>,
+         *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
          *     warnings: list<string>,
          * } $decoded
          */

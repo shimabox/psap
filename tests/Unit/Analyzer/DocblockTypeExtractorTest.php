@@ -10,7 +10,7 @@ use PhpParser\NameContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-// DocblockTypeExtractor: docblock の型文字列（@var / @param / @return）を
+// DocblockTypeExtractor: docblock の型文字列（@var / @param / @return / @throws）を
 // クラス名候補の FQCN 一覧に分解するテスト。
 // 名前解決はグローバル名前空間・use文なしの NameContext を使うため、
 // 素の型名がそのまま解決後の名前になる（先頭 `\` は剥がされる点だけ確認する）。
@@ -110,6 +110,17 @@ final class DocblockTypeExtractorTest extends TestCase
         $extractor = new DocblockTypeExtractor();
 
         self::assertSame(['User'], $extractor->extractReturnTypeNames($doc, $this->globalNameContext()));
+    }
+
+    public function testExtractThrowsTypeNames(): void
+    {
+        $doc = "/**\n * @throws DomainException|RuntimeException\n */";
+        $extractor = new DocblockTypeExtractor();
+
+        self::assertSame(
+            ['DomainException', 'RuntimeException'],
+            $extractor->extractThrowsTypeNames($doc, $this->globalNameContext()),
+        );
     }
 
     // --- 壊れた docblock は例外を投げず黙って空配列を返す ---

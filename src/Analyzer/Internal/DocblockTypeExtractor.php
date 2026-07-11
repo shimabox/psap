@@ -23,7 +23,7 @@ use PHPStan\PhpDocParser\ParserConfig;
 use Throwable;
 
 /**
- * docblock（`@var` / `@param` / `@return`）の型文字列からクラス名候補の FQCN を抽出する。
+ * docblock（`@var` / `@param` / `@return` / `@throws`）からクラス名候補の FQCN を抽出する。
  *
  * phpstan/phpdoc-parser に docblock の文字列をそのまま渡してパースし（php-class-diagram の
  * ような正規表現前処理はしない）、得られた TypeNode を再帰的に分解して
@@ -98,6 +98,24 @@ final class DocblockTypeExtractor
 
         $names = [];
         foreach ($doc->getReturnTagValues() as $tag) {
+            $names = [...$names, ...$this->flatten($tag->type)];
+        }
+
+        return $this->resolveAll($names, $nameContext);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function extractThrowsTypeNames(string $docComment, NameContext $nameContext): array
+    {
+        $doc = $this->parse($docComment);
+        if ($doc === null) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($doc->getThrowsTagValues() as $tag) {
             $names = [...$names, ...$this->flatten($tag->type)];
         }
 

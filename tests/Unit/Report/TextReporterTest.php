@@ -148,15 +148,27 @@ final class TextReporterTest extends TestCase
         $graph = new DependencyGraph(
             ['App\\Domain', 'App\\Infra'],
             [['App\\Domain', 'App\\Infra'], ['App\\Infra', 'App\\Domain']],
+            [
+                [
+                    'from' => 'App\\Domain',
+                    'to' => 'App\\Infra',
+                    'classDependencies' => [['from' => 'App\\Domain\\Order', 'to' => 'App\\Infra\\Repository']],
+                ],
+                [
+                    'from' => 'App\\Infra',
+                    'to' => 'App\\Domain',
+                    'classDependencies' => [['from' => 'App\\Infra\\Repository', 'to' => 'App\\Domain\\Order']],
+                ],
+            ],
         );
         $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\Domain', 'App\\Infra']], $graph);
 
         $output = (new TextReporter())->render($data);
 
         self::assertStringContainsString('Cycles (ADP violation):', $output);
-        self::assertStringContainsString('Components: App\\Domain, App\\Infra', $output);
-        self::assertStringContainsString('App\\Domain -> App\\Infra', $output);
-        self::assertStringContainsString('App\\Infra -> App\\Domain', $output);
+        self::assertStringContainsString('Path: App\\Domain -> App\\Infra -> App\\Domain', $output);
+        self::assertStringContainsString('App\\Domain\\Order -> App\\Infra\\Repository', $output);
+        self::assertStringContainsString('App\\Infra\\Repository -> App\\Domain\\Order', $output);
         // 統計行の後にセクションが出ること
         $statisticsPosition = strpos($output, 'Statistics: mean(D)=');
         $cyclesPosition = strpos($output, 'Cycles (ADP violation):');
@@ -165,7 +177,7 @@ final class TextReporterTest extends TestCase
         self::assertGreaterThan($statisticsPosition, $cyclesPosition);
     }
 
-    public function testRendersOnlyActualEdgesForCyclesWithThreeOrMoreNodes(): void
+    public function testRendersShortestRepresentativePathForBranchedCycle(): void
     {
         $metrics = [
             $this->metrics('App\\A', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
@@ -180,12 +192,9 @@ final class TextReporterTest extends TestCase
 
         $output = (new TextReporter())->render($data);
 
-        self::assertStringContainsString('Components: App\\A, App\\B, App\\C', $output);
-        self::assertStringContainsString('App\\A -> App\\B', $output);
-        self::assertStringContainsString('App\\A -> App\\C', $output);
-        self::assertStringContainsString('App\\B -> App\\A', $output);
-        self::assertStringContainsString('App\\C -> App\\A', $output);
-        self::assertStringNotContainsString('App\\B -> App\\C', $output);
+        self::assertStringContainsString('Path: App\\A -> App\\B -> App\\A', $output);
+        self::assertStringNotContainsString('App\\A -> App\\C', $output);
+        self::assertStringNotContainsString('App\\C -> App\\A', $output);
     }
 
     public function testOmitsCyclesSectionWhenNoCyclesExist(): void

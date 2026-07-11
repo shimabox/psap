@@ -8,6 +8,7 @@ use Bobsap\Analyzer\ClassInfo;
 use Bobsap\Analyzer\TypeKind;
 use Bobsap\Component\Component;
 use Bobsap\Metrics\MetricsCalculator;
+use Bobsap\Metrics\Zone;
 use PHPUnit\Framework\TestCase;
 
 // MetricsCalculator の Ca/Ce/I/A/D 計算のテスト。
@@ -112,8 +113,8 @@ final class MetricsCalculatorTest extends TestCase
 
     public function testInstabilityIsZeroForIsolatedComponentWithNoDependencies(): void
     {
-        // Ca=0, Ce=0 の孤立コンポーネントはゼロ除算せず I=0 とする
-        // （依存していないものは不安定になりようがないため）
+        // Ca=0, Ce=0 の孤立コンポーネントはゼロ除算せず I=0 とし、
+        // 安定性を評価できないためゾーン警告は付けない
         $lonely = $this->classInfo('App\\Isolated\\Lonely');
         $component = new Component('App\\Isolated', [$lonely]);
 
@@ -122,6 +123,7 @@ final class MetricsCalculatorTest extends TestCase
         self::assertSame(0, $metrics[0]->ca);
         self::assertSame(0, $metrics[0]->ce);
         self::assertEqualsWithDelta(0.0, $metrics[0]->instability, 0.0001);
+        self::assertSame(Zone::None, $metrics[0]->zone);
     }
 
     public function testAbstractnessIsZeroWhenComponentHasNoClasses(): void

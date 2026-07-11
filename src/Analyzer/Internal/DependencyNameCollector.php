@@ -28,7 +28,7 @@ use PhpParser\NodeVisitorAbstract;
  * $root の依存としては拾わない（境界で探索を止める）。
  *
  * docblock 解析（$docblockExtractor と $nameContext の両方が渡されたときだけ有効）は
- * プロパティの `@var` とメソッドの `@param` / `@return` を対象にする。
+ * プロパティの `@var` とメソッドの `@param` / `@return` / `@throws` を対象にする。
  * docblock 内の短縮名は $nameContext（NameResolver::getNameContext()）で FQCN 解決する。
  *
  * @internal DependencyAnalyzer の実装詳細
@@ -264,7 +264,7 @@ final class DependencyNameCollector extends NodeVisitorAbstract
     }
 
     /**
-     * メソッドの docblock から `@return` と各引数の `@param` のクラス名候補の FQCN を集める。
+     * メソッドの docblock から `@return`、`@throws`、各引数の `@param` のクラス名候補を集める。
      * コンストラクタのプロモートされた引数もここで拾える（docblock はメソッド側に書かれるため）。
      *
      * @return list<string>
@@ -281,7 +281,10 @@ final class DependencyNameCollector extends NodeVisitorAbstract
         }
 
         $docText = $doc->getText();
-        $names = $this->docblockExtractor->extractReturnTypeNames($docText, $this->nameContext);
+        $names = [
+            ...$this->docblockExtractor->extractReturnTypeNames($docText, $this->nameContext),
+            ...$this->docblockExtractor->extractThrowsTypeNames($docText, $this->nameContext),
+        ];
 
         foreach ($node->getParams() as $param) {
             if (!$param->var instanceof Expr\Variable || !is_string($param->var->name)) {

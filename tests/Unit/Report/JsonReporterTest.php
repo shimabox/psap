@@ -84,11 +84,29 @@ final class JsonReporterTest extends TestCase
 
     public function testEncodesCycles(): void
     {
-        $data = new ReportData([], MetricsSummary::from([]), [], [['App\\Domain', 'App\\Infra']]);
+        $graph = new DependencyGraph(
+            ['App\\Domain', 'App\\Infra'],
+            [['App\\Domain', 'App\\Infra'], ['App\\Infra', 'App\\Domain']],
+            [
+                [
+                    'from' => 'App\\Domain',
+                    'to' => 'App\\Infra',
+                    'classDependencies' => [['from' => 'App\\Domain\\Order', 'to' => 'App\\Infra\\Repository']],
+                ],
+                [
+                    'from' => 'App\\Infra',
+                    'to' => 'App\\Domain',
+                    'classDependencies' => [['from' => 'App\\Infra\\Repository', 'to' => 'App\\Domain\\Order']],
+                ],
+            ],
+        );
+        $data = new ReportData([], MetricsSummary::from([]), [], [['App\\Domain', 'App\\Infra']], $graph);
 
         $decoded = $this->decode((new JsonReporter())->render($data));
 
         self::assertSame([['App\\Domain', 'App\\Infra']], $decoded['cycles']);
+        self::assertSame(['App\\Domain', 'App\\Infra', 'App\\Domain'], $decoded['cyclePaths'][0]['path']);
+        self::assertSame($graph->edgeDetails, $decoded['cyclePaths'][0]['dependencies']);
     }
 
     public function testEncodesDependencyEdgesWithClassEvidence(): void
@@ -119,6 +137,7 @@ final class JsonReporterTest extends TestCase
         $decoded = $this->decode((new JsonReporter())->render($data));
 
         self::assertSame([], $decoded['cycles']);
+        self::assertSame([], $decoded['cyclePaths']);
     }
 
     public function testEncodesWarnings(): void
@@ -148,7 +167,7 @@ final class JsonReporterTest extends TestCase
 
     /**
      * @return array{
-     *     summary: array{componentCount: int, meanDistance: float, varianceDistance: float},
+     *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
      *     components: list<array{
      *         name: string,
      *         classCount: int,
@@ -162,6 +181,7 @@ final class JsonReporterTest extends TestCase
      *     }>,
      *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
      *     cycles: list<list<string>>,
+     *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
      *     warnings: list<string>,
      * }
      */
@@ -169,7 +189,7 @@ final class JsonReporterTest extends TestCase
     {
         /**
          * @var array{
-         *     summary: array{componentCount: int, meanDistance: float, varianceDistance: float},
+         *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
          *     components: list<array{
          *         name: string,
          *         classCount: int,
@@ -183,6 +203,7 @@ final class JsonReporterTest extends TestCase
          *     }>,
          *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
          *     cycles: list<list<string>>,
+         *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
          *     warnings: list<string>,
          * } $decoded
          */
