@@ -11,6 +11,8 @@ use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\MetricsCalculator;
 use Bobsap\Metrics\MetricsSummary;
 use Bobsap\Report\JsonReporter;
+use Bobsap\Report\MermaidReporter;
+use Bobsap\Report\PlantUmlReporter;
 use Bobsap\Report\ReportData;
 use Bobsap\Report\ReporterInterface;
 use Bobsap\Report\TextReporter;
@@ -176,6 +178,8 @@ final class AnalyzeCommand extends Command
         return [
             'text' => static fn (bool $verbose): ReporterInterface => new TextReporter($verbose),
             'json' => static fn (bool $verbose): ReporterInterface => new JsonReporter(),
+            'mermaid' => static fn (bool $verbose): ReporterInterface => new MermaidReporter(),
+            'plantuml' => static fn (bool $verbose): ReporterInterface => new PlantUmlReporter(),
         ];
     }
 }

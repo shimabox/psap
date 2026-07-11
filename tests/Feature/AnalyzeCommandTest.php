@@ -42,6 +42,35 @@ final class AnalyzeCommandTest extends TestCase
         self::assertGreaterThan(0, $decoded['summary']['componentCount']);
     }
 
+    public function testMermaidFormatRendersQuadrantChart(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'mermaid']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('quadrantChart', $display);
+        self::assertStringContainsString('quadrant-1 Useless Zone', $display);
+        self::assertStringContainsString('quadrant-3 Pain Zone', $display);
+        // フィクスチャの Fixture\App コンポーネントの点が出力されている
+        self::assertStringContainsString('"Fixture\\App (D=', $display);
+    }
+
+    public function testPlantUmlFormatRendersDependencyGraph(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'plantuml']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('@startuml', $display);
+        self::assertStringContainsString('@enduml', $display);
+        self::assertStringContainsString('rectangle "Fixture\\\\App\\n', $display);
+        self::assertStringContainsString('legend right', $display);
+    }
+
     public function testUnknownFormatExitsWithInputErrorCode(): void
     {
         $tester = $this->commandTester();
