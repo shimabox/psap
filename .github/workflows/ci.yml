@@ -1,5 +1,5 @@
 # CI ワークフロー。
-#   checks       … PHP 8.3 / 8.4 のマトリクスで composer validate / test / stan / cs を実行
+#   checks       … PHP 8.5 で composer validate / test / stan / cs を実行
 #   self-metrics … checks 成功後、bobsap 自身で src/ を計測し（ドッグフーディング）、
 #                   レポートを Artifact 化 + Step Summary に表示。循環依存があれば失敗させる
 name: CI
@@ -11,12 +11,8 @@ on:
 
 jobs:
   checks:
-    name: checks (PHP ${{ matrix.php-version }})
+    name: checks (PHP 8.5)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php-version: ["8.3", "8.4"]
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -26,7 +22,7 @@ jobs:
       - name: PHP をセットアップ
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: "8.5"
           coverage: none
 
       - name: composer.json / composer.lock を検証
@@ -37,9 +33,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: ${{ runner.os }}-php${{ matrix.php-version }}-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-php8.5-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php${{ matrix.php-version }}-composer-
+            ${{ runner.os }}-php8.5-composer-
 
       - name: 依存関係をインストール
         run: composer install --prefer-dist --no-progress
@@ -64,16 +60,16 @@ jobs:
       - name: PHP をセットアップ
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.4"
+          php-version: "8.5"
           coverage: none
 
       - name: Composer パッケージをキャッシュ
         uses: actions/cache@v4
         with:
           path: vendor
-          key: ${{ runner.os }}-php8.4-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-php8.5-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php8.4-composer-
+            ${{ runner.os }}-php8.5-composer-
 
       - name: 依存関係をインストール
         run: composer install --prefer-dist --no-progress

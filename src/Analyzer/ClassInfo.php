@@ -26,9 +26,12 @@ final readonly class ClassInfo
         public string $filePath,
         array $dependencies,
     ) {
-        $this->dependencies = array_values(array_unique(array_filter(
-            $dependencies,
-            fn (string $dependency): bool => $dependency !== $this->fqcn,
-        )));
+        $this->dependencies = $dependencies
+            |> (fn (array $items): array => array_filter(
+                $items,
+                fn (string $dependency): bool => $dependency !== $this->fqcn,
+            ))
+            |> array_unique(...)
+            |> array_values(...);
     }
 }

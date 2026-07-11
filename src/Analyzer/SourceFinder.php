@@ -32,7 +32,9 @@ final class SourceFinder
             }
         }
 
-        $files = array_values(array_unique($files));
+        $files = $files
+            |> array_unique(...)
+            |> array_values(...);
         sort($files);
 
         return $files;

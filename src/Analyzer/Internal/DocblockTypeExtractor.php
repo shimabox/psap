@@ -186,7 +186,10 @@ final class DocblockTypeExtractor
 
     private function isPrimitiveOrPseudo(string $name): bool
     {
-        return in_array(strtolower(ltrim($name, '\\')), self::PRIMITIVE_OR_PSEUDO_TYPES, true);
+        return $name
+            |> (static fn (string $value): string => ltrim($value, '\\'))
+            |> strtolower(...)
+            |> (static fn (string $value): bool => in_array($value, self::PRIMITIVE_OR_PSEUDO_TYPES, true));
     }
 
     /**
