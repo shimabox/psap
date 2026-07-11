@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Bobsap\Report;
 
+use Bobsap\Component\Component;
+use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\Zone;
 
@@ -11,8 +13,8 @@ use Bobsap\Metrics\Zone;
  * PlantUML でコンポーネント依存グラフを出力するレポーター。
  *
  * ノード = コンポーネント（ラベルに I/A/D を併記し、ゾーンごとに色分け）。
- * エッジ = コンポーネント間の依存（クラス単位の依存を「コンポーネント名ペア」に
- * 集約し重複排除したもの。対応表にない FQCN・自コンポーネント内依存は無視する）。
+ * エッジ = コンポーネント間の依存（DependencyGraph が集約・重複排除したもの）。
+ * 循環依存（ADP違反）に含まれるエッジは赤色の太線で強調する。
  */
 final class PlantUmlReporter implements ReporterInterface
 {
@@ -21,6 +23,9 @@ final class PlantUmlReporter implements ReporterInterface
 
     /** 無駄ゾーン（黄系） */
     private const string USELESS_COLOR = '#FFF2CC';
+
+    /** 循環依存（ADP違反）に含まれるエッジのスタイル */
+    private const string CYCLE_EDGE_STYLE = '-[#red,thickness=2]->';
 
     public function render(ReportData $data): string
     {
@@ -38,8 +43,13 @@ final class PlantUmlReporter implements ReporterInterface
             $lines[] = $this->nodeLine($metrics, $nodeIdByComponentName[$metrics->component->name]);
         }
 
-        foreach ($this->buildEdges($data->componentMetrics, $nodeIdByComponentName) as [$from, $to]) {
-            $lines[] = sprintf('%s --> %s', $from, $to);
+        $graph = DependencyGraph::fromComponents($this->components($data->componentMetrics));
+        foreach ($graph->edges as [$from, $to]) {
+            $lines[] = $this->edgeLine(
+                $nodeIdByComponentName[$from],
+                $nodeIdByComponentName[$to],
+                $this->isCycleEdge($from, $to, $data->cycles),
+            );
         }
 
         $lines[] = '';
@@ -49,6 +59,7 @@ final class PlantUmlReporter implements ReporterInterface
         $lines[] = '  Pain Zone = ' . self::PAIN_COLOR;
         $lines[] = '  Useless Zone = ' . self::USELESS_COLOR;
         $lines[] = '  Normal = no color';
+        $lines[] = '  Red edge = dependency cycle (ADP violation)';
         $lines[] = 'endlegend';
         $lines[] = '@enduml';
 
@@ -72,6 +83,18 @@ final class PlantUmlReporter implements ReporterInterface
         }
 
         return $map;
+    }
+
+    /**
+     * @param list<ComponentMetrics> $componentMetrics
+     * @return list<Component>
+     */
+    private function components(array $componentMetrics): array
+    {
+        return array_map(
+            static fn (ComponentMetrics $metrics): Component => $metrics->component,
+            $componentMetrics,
+        );
     }
 
     private function nodeLine(ComponentMetrics $metrics, string $nodeId): string
@@ -103,58 +126,26 @@ final class PlantUmlReporter implements ReporterInterface
         return str_replace('\\', '\\\\', $name);
     }
 
-    /**
-     * クラス単位の依存を「コンポーネント名ペア」に集約し重複排除してエッジ一覧を作る。
-     * 対応表にない FQCN（解析対象外への依存）・自コンポーネント内依存は無視する。
-     *
-     * @param list<ComponentMetrics> $componentMetrics
-     * @param array<string, string> $nodeIdByComponentName
-     * @return list<array{0: string, 1: string}>
-     */
-    private function buildEdges(array $componentMetrics, array $nodeIdByComponentName): array
+    private function edgeLine(string $fromId, string $toId, bool $isCycleEdge): string
     {
-        $componentNameByFqcn = $this->buildComponentNameMap($componentMetrics);
+        $style = $isCycleEdge ? self::CYCLE_EDGE_STYLE : '-->';
 
-        $seenPairs = [];
-        $edges = [];
-        foreach ($componentMetrics as $metrics) {
-            $fromName = $metrics->component->name;
-            foreach ($metrics->component->classInfos as $classInfo) {
-                foreach ($classInfo->dependencies as $dependency) {
-                    $toName = $componentNameByFqcn[$dependency] ?? null;
-                    if ($toName === null || $toName === $fromName) {
-                        continue;
-                    }
-
-                    $pairKey = $fromName . '|' . $toName;
-                    if (isset($seenPairs[$pairKey])) {
-                        continue;
-                    }
-                    $seenPairs[$pairKey] = true;
-
-                    $edges[] = [$nodeIdByComponentName[$fromName], $nodeIdByComponentName[$toName]];
-                }
-            }
-        }
-
-        return $edges;
+        return sprintf('%s %s %s', $fromId, $style, $toId);
     }
 
     /**
-     * クラスの FQCN → 所属コンポーネント名 の対応表を作る（MetricsCalculator と同じ考え方）。
+     * エッジ (from, to) が循環（同じ SCC）に含まれるかどうか。
      *
-     * @param list<ComponentMetrics> $componentMetrics
-     * @return array<string, string>
+     * @param list<list<string>> $cycles
      */
-    private function buildComponentNameMap(array $componentMetrics): array
+    private function isCycleEdge(string $from, string $to, array $cycles): bool
     {
-        $map = [];
-        foreach ($componentMetrics as $metrics) {
-            foreach ($metrics->component->classInfos as $classInfo) {
-                $map[$classInfo->fqcn] = $metrics->component->name;
+        foreach ($cycles as $cycle) {
+            if (in_array($from, $cycle, true) && in_array($to, $cycle, true)) {
+                return true;
             }
         }
 
-        return $map;
+        return false;
     }
 }

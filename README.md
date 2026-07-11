@@ -69,13 +69,14 @@ bobsap analyze <paths>... [options]
 | `--output` | 出力先ファイル（省略時は標準出力） | 標準出力 |
 | `--exclude` | 除外パターン（fnmatch 形式、複数指定可） | なし |
 | `--threshold` | D 値がこの値を超えるコンポーネントがあれば exit code 1 にする | なし（チェックしない） |
+| `--fail-on-cycle` | 循環依存（ADP違反）が1つでもあれば exit code 1 にする | なし（チェックしない） |
 
 ### exit code
 
 | コード | 意味 |
 |---|---|
-| `0` | 正常終了（`--threshold` 指定時は超過コンポーネントなし） |
-| `1` | `--threshold` を超えるコンポーネントがあった |
+| `0` | 正常終了（`--threshold` / `--fail-on-cycle` 指定時はゲート違反なし） |
+| `1` | `--threshold` を超えるコンポーネントがあった、または `--fail-on-cycle` 指定時に循環依存が見つかった |
 | `2` | 入力エラー（存在しないパス、未知の `--format` など） |
 
 ## 出力例
@@ -90,7 +91,7 @@ bobsap - Stable Abstractions Principle metrics
 Component         Classes  Ca  Ce     I     A     D  Zone
 ----------------  -------  --  --  ----  ----  ----  ----------
 Bobsap\Analyzer         7   4   0  0.00  0.00  1.00  ⚠ 苦痛ゾーン
-Bobsap\Component        2   3   0  0.00  0.00  1.00  ⚠ 苦痛ゾーン
+Bobsap\Component        4   4   0  0.00  0.00  1.00  ⚠ 苦痛ゾーン
 Bobsap\Console          1   0   1  1.00  0.00  0.00
 Bobsap\Metrics          4   6   2  0.25  0.00  0.75  ⚠ 苦痛ゾーン
 Bobsap\Report           6   1   5  0.83  0.17  0.00
@@ -138,18 +139,77 @@ C3 --> C1
 C3 --> C2
 C3 --> C4
 C3 --> C5
-C4 --> C2
 C4 --> C1
-C5 --> C4
+C4 --> C2
 C5 --> C1
+C5 --> C2
+C5 --> C4
 
 legend right
   Pain Zone = #FFCCCC
   Useless Zone = #FFF2CC
   Normal = no color
+  Red edge = dependency cycle (ADP violation)
 endlegend
 @enduml
 ```
+
+## 循環依存検出（ADP）
+
+`bobsap` は SAP のメトリクスに加えて、第14章の**非循環依存関係の原則（ADP: Acyclic Dependencies Principle）**の違反もチェックします。コンポーネント間の依存グラフに循環（A が B に依存し、B も何らかの経路で A に依存し返す状態）があると、片方の変更が芋づる式にもう一方へ波及し、ビルド順序やデプロイ単位も分割できなくなります。相互依存（2ノード）だけでなく、3コンポーネント以上をまたぐ間接的な循環も強連結成分（SCC）検出によってまとめて見つけます。
+
+### text 出力
+
+循環が見つかったコンポーネントがあるときだけ、統計行の後に `Cycles (ADP violation):` セクションが出ます（循環がなければ何も出ません）。2ノードの相互依存は `<->`、3ノード以上は先頭コンポーネントに戻る `->` チェーンで表記します。
+
+```
+bobsap - Stable Abstractions Principle metrics
+
+Component         Classes  Ca  Ce     I     A     D  Zone
+----------------  -------  --  --  ----  ----  ----  ----------
+Fixture\Cyclic\A        1   1   1  0.50  0.00  0.50
+Fixture\Cyclic\B        1   1   1  0.50  0.00  0.50
+Fixture\Cyclic\C        1   1   1  0.50  0.00  0.50
+Fixture\Cyclic\D        1   1   1  0.50  0.00  0.50
+Fixture\Cyclic\E        1   1   1  0.50  0.00  0.50
+
+Statistics: mean(D)=0.50, variance(D)=0.00
+
+Cycles (ADP violation):
+  - Fixture\Cyclic\A <-> Fixture\Cyclic\B
+  - Fixture\Cyclic\C -> Fixture\Cyclic\D -> Fixture\Cyclic\E -> Fixture\Cyclic\C
+```
+
+### json 出力
+
+`cycles` フィールドに循環ごとのコンポーネント名リストが入ります（循環がなければ空配列 `[]`）。
+
+```json
+"cycles": [
+    ["Fixture\\Cyclic\\A", "Fixture\\Cyclic\\B"],
+    ["Fixture\\Cyclic\\C", "Fixture\\Cyclic\\D", "Fixture\\Cyclic\\E"]
+]
+```
+
+### plantuml 出力
+
+循環（SCC）に含まれる依存エッジは赤い太線 `-[#red,thickness=2]->` で強調されます（前掲の「plantuml」の凡例に `Red edge = dependency cycle (ADP violation)` が常に併記されます）。
+
+### `--fail-on-cycle` で CI ゲートにする
+
+`--threshold` と同じ流儀で、循環が1つでもあれば stderr に一覧を出して exit code 1 にします。
+
+```bash
+docker compose run --rm app php bin/bobsap analyze tests/Fixtures/CyclicProject --depth 3 --fail-on-cycle
+# 循環依存（ADP違反）が見つかりました:
+#   - Fixture\Cyclic\A <-> Fixture\Cyclic\B
+#   - Fixture\Cyclic\C -> Fixture\Cyclic\D -> Fixture\Cyclic\E -> Fixture\Cyclic\C
+# exit code: 1
+```
+
+### Mermaid の制限
+
+`--format mermaid` の `quadrantChart` はコンポーネントを点として I/A 平面に配置するだけで、コンポーネント間の依存エッジ（矢印）を表現できません。そのため循環の可視化は非対応です。循環を図で確認したい場合は `--format plantuml` を使ってください。
 
 ## bobsap を bobsap で計測する
 
@@ -165,7 +225,7 @@ bobsap - Stable Abstractions Principle metrics
 Component         Classes  Ca  Ce     I     A     D  Zone
 ----------------  -------  --  --  ----  ----  ----  ----------
 Bobsap\Analyzer         7   4   0  0.00  0.00  1.00  ⚠ 苦痛ゾーン
-Bobsap\Component        2   3   0  0.00  0.00  1.00  ⚠ 苦痛ゾーン
+Bobsap\Component        4   4   0  0.00  0.00  1.00  ⚠ 苦痛ゾーン
 Bobsap\Console          1   0   1  1.00  0.00  0.00
 Bobsap\Metrics          4   6   2  0.25  0.00  0.75  ⚠ 苦痛ゾーン
 Bobsap\Report           6   1   5  0.83  0.17  0.00
@@ -184,6 +244,8 @@ Classes in Bobsap\Analyzer:
 Classes in Bobsap\Component:
   - Bobsap\Component\Component (concrete)
   - Bobsap\Component\ComponentClassifier (concrete)
+  - Bobsap\Component\CycleDetector (concrete)
+  - Bobsap\Component\DependencyGraph (concrete)
 
 Classes in Bobsap\Metrics:
   - Bobsap\Metrics\ComponentMetrics (concrete)
@@ -242,6 +304,7 @@ jobs:
 - **設定ファイル非対応**（`.bobsap.json` 等はなく、CLI オプションのみ）
 - **コンポーネント分類は名前空間ベースのみ**（ディレクトリベースの分類はしない）
 - **D 値の推移記録・HTML レポートは非対応**（`--format json` の出力を自前で時系列に貯めることは可能）
+- **Mermaid（quadrantChart）は循環依存を表示できない**（依存エッジを描けない図種のため。循環を図で見たい場合は `--format plantuml` を使う）
 
 ## 開発者向け
 
@@ -263,12 +326,14 @@ Makefile を経由せず直接叩く場合は `docker compose run --rm app compo
 
 データフロー: `SourceFinder → DependencyAnalyzer → ClassInfo[] → ComponentClassifier → Component[] → MetricsCalculator → ComponentMetrics[] → Reporter`
 
+`Component[]` は並行して `DependencyGraph → CycleDetector` にも渡され、循環依存（ADP違反）の検出結果が `ReportData` 経由で各 Reporter に渡ります。
+
 各段が純粋な変換になるように分割されています。
 
 ```
 src/
 ├── Analyzer/   # ファイル走査（SourceFinder）・AST 解析（DependencyAnalyzer）・型/依存情報（ClassInfo）
-├── Component/  # 名前空間 → コンポーネントへの分類
+├── Component/  # 名前空間 → コンポーネントへの分類、依存グラフ（DependencyGraph）・循環検出（CycleDetector）
 ├── Metrics/    # Ca/Ce/I/A/D の計算、ゾーン判定、統計
 ├── Report/     # text / json / mermaid / plantuml の各レンダラー
 └── Console/    # symfony/console による CLI コマンド（analyze）

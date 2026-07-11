@@ -217,6 +217,44 @@ TDD 対象。先に `tests/Fixtures/SimpleProject/` を作る（interface / abst
 
 ---
 
+## 4.5 v1.1 フェーズ計画（php-class-diagram 調査から採用。2026-07-11 ユーザー選択: A/B/C/D 全部）
+
+参考元: `~/shimabox/sandbox/php-class-diagram`（smeghead 作）。調査済み知見は進捗メモ参照。
+
+### Phase 6: 循環依存検出（ADP） ✅ 完了条件: 循環が text/JSON で報告され、PlantUML で赤矢印表示される
+
+書籍第14章の ADP（非循環依存関係の原則）に対応。php-class-diagram の相互依存検出（2ノード限定）を SCC に発展させる。
+
+- [ ] コンポーネント間依存グラフの導出を PlantUmlReporter の private から共有クラスへ抽出（`Bobsap\Component\DependencyGraph`: ノード=コンポーネント名、エッジ=依存。導出ロジックは既存と同一）
+- [ ] テスト: DependencyGraph のエッジ導出（既存 PlantUmlReporter テストの移設含む）
+- [ ] テスト: SCC 検出（`CycleDetector`。Tarjan または Kahn ベース。2ノード相互依存 / 3ノード以上の循環 / 循環なし / 自己ループなし）
+- [ ] テスト: TextReporter に `Cycles:` セクション（循環なしなら非表示）、JsonReporter に `cycles: [[名前,...]]`
+- [ ] テスト: PlantUmlReporter で SCC 内のエッジを赤色 `-[#red,thickness=2]->` 表示
+- [ ] テスト: `--fail-on-cycle` オプション（循環があれば exit 1。threshold と同じく stderr に通知）
+- [ ] Mermaid（quadrantChart）はエッジを表現できないため対象外（README に明記）
+
+### Phase 7: docblock 型の解析 ✅ 完了条件: @var/@param/@return と Product[] 形式から依存が拾える
+
+- [ ] 依存追加: `phpstan/phpdoc-parser ^2`
+- [ ] テスト: `@var X` / `@param X $p` / `@return X`（プロパティ・メソッド・プロモートされたコンストラクタ引数）
+- [ ] テスト: `X[]` / `array<X>` / `array<int, X>` / `?X` / `X|Y` の分解、プリミティブ型・`array<int,string>` 等クラスでないものの除外
+- [ ] テスト: docblock 内の短縮名が use 文・現在名前空間で FQCN 解決されること（php-parser の NameContext を活用。php-class-diagram は自前解決だが、bobsap は NameResolver の文脈を使う方が素直）
+- [ ] デフォルト有効、`--no-docblock` でオフ（Feature テスト含む）
+- [ ] README の制限事項から docblock の項を更新
+
+### Phase 8: CI + セルフ計測 ✅ 完了条件: GitHub Actions が push/PR で走る構成ができている
+
+- [ ] `.github/workflows/ci.yml`: composer validate --strict → test / stan / cs。PHP 8.3 / 8.4 のマトリクス（Docker ではなく shivammathur/setup-php を使う方が Actions では素直。判断は実装時）
+- [ ] セルフ計測ジョブ: bobsap で src/ を計測し、text + mermaid + plantuml 出力を Artifact にアップロード
+- [ ] ローカルでは actionlint 等での構文確認まで（実際の実行は GitHub push 後になる旨を報告）
+
+### Phase 9: 配布強化 ✅ 完了条件: phar が生成でき、配布物がスリム化されている
+
+- [ ] `.gitattributes`: tests/ .github/ 等を export-ignore（Packagist tarball スリム化）
+- [ ] phar ビルド手段の整備（clue/phar-composer 等。composer script `build` として。Docker 経由で生成できること）
+- [ ] PlantUML レンダラー同梱の Docker イメージ（`docker/Dockerfile` に別ステージ or 別 Dockerfile。CJK フォント `fonts-noto-cjk` 入り。「analyze して即 PNG まで出す」ユースケース用。工数が膨らむ場合は見送って報告してよい）
+- [ ] README に配布形態の説明を追記
+
 ## 5. スコープ外（v1 ではやらない・将来候補）
 
 - docblock 型の解析

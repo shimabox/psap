@@ -81,6 +81,24 @@ final class JsonReporterTest extends TestCase
         self::assertSame(1, $decoded['components'][0]['classCount']);
     }
 
+    public function testEncodesCycles(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), [], [['App\\Domain', 'App\\Infra']]);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertSame([['App\\Domain', 'App\\Infra']], $decoded['cycles']);
+    }
+
+    public function testEncodesEmptyCyclesArrayWhenNoCyclesExist(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), []);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertSame([], $decoded['cycles']);
+    }
+
     public function testEncodesWarnings(): void
     {
         $data = new ReportData([], MetricsSummary::from([]), ['パースエラーのためスキップしました: /x.php']);
@@ -120,6 +138,7 @@ final class JsonReporterTest extends TestCase
      *         zone: string|null,
      *         classes: list<array{fqcn: string, kind: string}>,
      *     }>,
+     *     cycles: list<list<string>>,
      *     warnings: list<string>,
      * }
      */
@@ -139,6 +158,7 @@ final class JsonReporterTest extends TestCase
          *         zone: string|null,
          *         classes: list<array{fqcn: string, kind: string}>,
          *     }>,
+         *     cycles: list<list<string>>,
          *     warnings: list<string>,
          * } $decoded
          */

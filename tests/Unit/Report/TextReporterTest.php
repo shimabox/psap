@@ -138,6 +138,52 @@ final class TextReporterTest extends TestCase
         self::assertStringContainsString('App\\Domain\\User (concrete)', $output);
     }
 
+    public function testRendersCyclesSectionAfterStatisticsWhenCyclesExist(): void
+    {
+        $metrics = [
+            $this->metrics('App\\Domain', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
+            $this->metrics('App\\Infra', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\Domain', 'App\\Infra']]);
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('Cycles (ADP violation):', $output);
+        self::assertStringContainsString('App\\Domain <-> App\\Infra', $output);
+        // 統計行の後にセクションが出ること
+        $statisticsPosition = strpos($output, 'Statistics: mean(D)=');
+        $cyclesPosition = strpos($output, 'Cycles (ADP violation):');
+        self::assertNotFalse($statisticsPosition);
+        self::assertNotFalse($cyclesPosition);
+        self::assertGreaterThan($statisticsPosition, $cyclesPosition);
+    }
+
+    public function testRendersChainNotationForCyclesWithThreeOrMoreNodes(): void
+    {
+        $metrics = [
+            $this->metrics('App\\A', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
+            $this->metrics('App\\B', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
+            $this->metrics('App\\C', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\A', 'App\\B', 'App\\C']]);
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('App\\A -> App\\B -> App\\C -> App\\A', $output);
+    }
+
+    public function testOmitsCyclesSectionWhenNoCyclesExist(): void
+    {
+        $metrics = [
+            $this->metrics('App\\Domain', ca: 8, ce: 2, instability: 0.2, abstractness: 0.75, distance: 0.05, zone: Zone::None),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringNotContainsString('Cycles', $output);
+    }
+
     public function testAppendsWarningsAtEnd(): void
     {
         $metrics = [

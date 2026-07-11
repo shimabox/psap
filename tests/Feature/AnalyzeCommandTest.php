@@ -16,6 +16,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 final class AnalyzeCommandTest extends TestCase
 {
     private const SIMPLE_PROJECT = __DIR__ . '/../Fixtures/SimpleProject';
+    private const CYCLIC_PROJECT = __DIR__ . '/../Fixtures/CyclicProject';
 
     public function testTextFormatRendersTableAndExitsSuccessfully(): void
     {
@@ -114,6 +115,43 @@ final class AnalyzeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exitCode);
     }
 
+    public function testFailOnCycleExitsWithFailureCodeWhenCyclesExist(): void
+    {
+        $tester = $this->commandTester();
+
+        // depth=3 で A/B/C/D/E が分かれる（depth=2 だと Fixture\Cyclic に統合され、
+        // コンポーネント内依存として無視されてしまうため循環が消える）
+        $tester->execute(
+            ['paths' => [self::CYCLIC_PROJECT], '--depth' => '3', '--fail-on-cycle' => true],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('循環依存', $tester->getErrorOutput());
+    }
+
+    public function testFailOnCycleExitsSuccessfullyWhenNoCyclesExist(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(
+            ['paths' => [self::SIMPLE_PROJECT], '--fail-on-cycle' => true],
+        );
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    public function testJsonFormatIncludesCyclesForCyclicFixture(): void
+    {
+        $tester = $this->commandTester();
+
+        $tester->execute(['paths' => [self::CYCLIC_PROJECT], '--depth' => '3', '--format' => 'json']);
+
+        $decoded = $this->decodeJson($tester->getDisplay());
+
+        self::assertNotEmpty($decoded['cycles']);
+    }
+
     public function testOutputOptionWritesToFileInsteadOfStdout(): void
     {
         $outputPath = sys_get_temp_dir() . '/bobsap-analyze-command-test-' . uniqid() . '.txt';
@@ -189,6 +227,7 @@ final class AnalyzeCommandTest extends TestCase
      *         zone: string|null,
      *         classes: list<array{fqcn: string, kind: string}>,
      *     }>,
+     *     cycles: list<list<string>>,
      *     warnings: list<string>,
      * }
      */
@@ -208,6 +247,7 @@ final class AnalyzeCommandTest extends TestCase
          *         zone: string|null,
          *         classes: list<array{fqcn: string, kind: string}>,
          *     }>,
+         *     cycles: list<list<string>>,
          *     warnings: list<string>,
          * } $decoded
          */

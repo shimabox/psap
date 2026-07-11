@@ -104,58 +104,73 @@ final class PlantUmlReporterTest extends TestCase
         self::assertStringContainsString('Pain Zone = #FFCCCC', $output);
         self::assertStringContainsString('Useless Zone = #FFF2CC', $output);
         self::assertStringContainsString('Normal = no color', $output);
+        self::assertStringContainsString('Red edge = dependency cycle (ADP violation)', $output);
     }
 
-    public function testAggregatesMultipleClassDependenciesIntoSingleEdge(): void
+    // エッジ導出（集約・対象外依存の無視・コンポーネント内依存の無視）のテストは
+    // Bobsap\Component\DependencyGraph に共有クラスとして抽出済みのため、そちらに移設した
+    // （tests/Unit/Component/DependencyGraphTest.php）。ここではレンダリング結果のみ検証する。
+    public function testRendersEdgeBetweenComponents(): void
     {
-        // App\Domain の2クラスがどちらも App\Infra 内のクラスに依存している
         $domainClasses = [
             new ClassInfo('App\\Domain\\User', TypeKind::ConcreteClass, '/dummy.php', ['App\\Infra\\UserRepository']),
-            new ClassInfo('App\\Domain\\Order', TypeKind::ConcreteClass, '/dummy.php', ['App\\Infra\\UserRepository']),
         ];
         $infraClasses = [
             new ClassInfo('App\\Infra\\UserRepository', TypeKind::ConcreteClass, '/dummy.php', []),
         ];
         $metrics = [
-            $this->metrics('App\\Domain', ca: 0, ce: 2, instability: 1.0, abstractness: 0.0, distance: 0.0, zone: Zone::None, classInfos: $domainClasses),
-            $this->metrics('App\\Infra', ca: 2, ce: 0, instability: 0.0, abstractness: 0.0, distance: 1.0, zone: Zone::None, classInfos: $infraClasses),
+            $this->metrics('App\\Domain', ca: 0, ce: 1, instability: 1.0, abstractness: 0.0, distance: 0.0, zone: Zone::None, classInfos: $domainClasses),
+            $this->metrics('App\\Infra', ca: 1, ce: 0, instability: 0.0, abstractness: 0.0, distance: 1.0, zone: Zone::None, classInfos: $infraClasses),
         ];
         $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
 
         $output = (new PlantUmlReporter())->render($data);
 
-        self::assertSame(1, substr_count($output, 'C1 --> C2'));
+        self::assertStringContainsString('C1 --> C2', $output);
     }
 
-    public function testIgnoresDependenciesOutsideAnalyzedComponents(): void
+    public function testRendersCycleEdgesInRed(): void
     {
-        $domainClasses = [
-            new ClassInfo('App\\Domain\\User', TypeKind::ConcreteClass, '/dummy.php', ['Vendor\\SomeLib\\Thing']),
+        // App\A <-> App\B の相互依存（循環）
+        $aClasses = [
+            new ClassInfo('App\\A\\X', TypeKind::ConcreteClass, '/dummy.php', ['App\\B\\X']),
+        ];
+        $bClasses = [
+            new ClassInfo('App\\B\\X', TypeKind::ConcreteClass, '/dummy.php', ['App\\A\\X']),
         ];
         $metrics = [
-            $this->metrics('App\\Domain', ca: 0, ce: 0, instability: 0.0, abstractness: 0.0, distance: 1.0, zone: Zone::None, classInfos: $domainClasses),
+            $this->metrics('App\\A', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None, classInfos: $aClasses),
+            $this->metrics('App\\B', ca: 1, ce: 1, instability: 0.5, abstractness: 0.0, distance: 0.5, zone: Zone::None, classInfos: $bClasses),
         ];
-        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\A', 'App\\B']]);
 
         $output = (new PlantUmlReporter())->render($data);
 
-        self::assertStringNotContainsString('-->', $output);
+        self::assertStringContainsString('C1 -[#red,thickness=2]-> C2', $output);
+        self::assertStringContainsString('C2 -[#red,thickness=2]-> C1', $output);
+        self::assertStringNotContainsString('C1 --> C2', $output);
+        self::assertStringNotContainsString('C2 --> C1', $output);
     }
 
-    public function testIgnoresIntraComponentDependencies(): void
+    public function testDoesNotColorEdgesOutsideCycle(): void
     {
         $domainClasses = [
-            new ClassInfo('App\\Domain\\User', TypeKind::ConcreteClass, '/dummy.php', ['App\\Domain\\Address']),
-            new ClassInfo('App\\Domain\\Address', TypeKind::ConcreteClass, '/dummy.php', []),
+            new ClassInfo('App\\Domain\\User', TypeKind::ConcreteClass, '/dummy.php', ['App\\Infra\\UserRepository']),
+        ];
+        $infraClasses = [
+            new ClassInfo('App\\Infra\\UserRepository', TypeKind::ConcreteClass, '/dummy.php', []),
         ];
         $metrics = [
-            $this->metrics('App\\Domain', ca: 0, ce: 0, instability: 0.0, abstractness: 0.0, distance: 1.0, zone: Zone::None, classInfos: $domainClasses),
+            $this->metrics('App\\Domain', ca: 0, ce: 1, instability: 1.0, abstractness: 0.0, distance: 0.0, zone: Zone::None, classInfos: $domainClasses),
+            $this->metrics('App\\Infra', ca: 1, ce: 0, instability: 0.0, abstractness: 0.0, distance: 1.0, zone: Zone::None, classInfos: $infraClasses),
         ];
-        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+        // 循環は別コンポーネントの組み合わせなので、Domain -> Infra のエッジは赤くならない
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [], [['App\\Other1', 'App\\Other2']]);
 
         $output = (new PlantUmlReporter())->render($data);
 
-        self::assertStringNotContainsString('-->', $output);
+        self::assertStringContainsString('C1 --> C2', $output);
+        self::assertStringNotContainsString('#red', $output);
     }
 
     /**

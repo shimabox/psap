@@ -7,6 +7,8 @@ namespace Bobsap\Console;
 use Bobsap\Analyzer\DependencyAnalyzer;
 use Bobsap\Analyzer\SourceFinder;
 use Bobsap\Component\ComponentClassifier;
+use Bobsap\Component\CycleDetector;
+use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\MetricsCalculator;
 use Bobsap\Metrics\MetricsSummary;
@@ -31,7 +33,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * exit code 規約:
  *   0 = 正常終了
- *   1 = --threshold で指定した D 値を超えるコンポーネントがあった
+ *   1 = --threshold で指定した D 値を超えるコンポーネントがあった、
+ *       または --fail-on-cycle 指定時に循環依存（ADP違反）が見つかった
  *   2 = 入力エラー（存在しないパス、未知の --format）
  */
 #[AsCommand(name: 'analyze', description: 'PHP コードベースの SAP メトリクス（Ca/Ce/I/A/D）を計測する')]
@@ -76,6 +79,12 @@ final class AnalyzeCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'D 値がこれを超えるコンポーネントがあれば exit code 1 にする',
+            )
+            ->addOption(
+                'fail-on-cycle',
+                null,
+                InputOption::VALUE_NONE,
+                '循環依存（ADP違反）が1つでもあれば exit code 1 にする',
             );
     }
 
@@ -116,13 +125,17 @@ final class AnalyzeCommand extends Command
         $thresholdOption = $input->getOption('threshold');
         $threshold = $thresholdOption !== null ? (float) $thresholdOption : null;
 
+        /** @var bool $failOnCycle */
+        $failOnCycle = $input->getOption('fail-on-cycle');
+
         $files = (new SourceFinder())->find($paths, $excludePatterns);
         $analysisResult = (new DependencyAnalyzer())->analyze($files);
         $components = (new ComponentClassifier())->classify($analysisResult->classInfos, $depth);
         $componentMetrics = (new MetricsCalculator())->calculate($components);
         $summary = MetricsSummary::from($componentMetrics);
+        $cycles = (new CycleDetector())->detect(DependencyGraph::fromComponents($components));
 
-        $reportData = new ReportData($componentMetrics, $summary, $analysisResult->warnings);
+        $reportData = new ReportData($componentMetrics, $summary, $analysisResult->warnings, $cycles);
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);
 
@@ -150,7 +163,31 @@ final class AnalyzeCommand extends Command
             }
         }
 
+        if ($failOnCycle && $cycles !== []) {
+            $errorOutput->writeln('<error>循環依存（ADP違反）が見つかりました:</error>');
+            foreach ($cycles as $cycle) {
+                $errorOutput->writeln('  - ' . $this->formatCycle($cycle));
+            }
+
+            return Command::FAILURE;
+        }
+
         return Command::SUCCESS;
+    }
+
+    /**
+     * 循環1件分の表示行を作る（TextReporter::cycleLine と同じ規則）。
+     * 2ノードは `<->`、3ノード以上は先頭に戻る `->` チェーンで表す。
+     *
+     * @param list<string> $cycle
+     */
+    private function formatCycle(array $cycle): string
+    {
+        if (count($cycle) === 2) {
+            return sprintf('%s <-> %s', $cycle[0], $cycle[1]);
+        }
+
+        return implode(' -> ', $cycle) . ' -> ' . $cycle[0];
     }
 
     /**

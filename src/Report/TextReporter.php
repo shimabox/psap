@@ -48,6 +48,14 @@ final class TextReporter implements ReporterInterface
             $data->summary->varianceDistance,
         );
 
+        if ($data->cycles !== []) {
+            $lines[] = '';
+            $lines[] = 'Cycles (ADP violation):';
+            foreach ($data->cycles as $cycle) {
+                $lines[] = $this->cycleLine($cycle);
+            }
+        }
+
         foreach ($data->componentMetrics as $metrics) {
             if (!$this->verbose && $metrics->zone === Zone::None) {
                 continue;
@@ -74,6 +82,20 @@ final class TextReporter implements ReporterInterface
     private function classLine(ClassInfo $classInfo): string
     {
         return sprintf('  - %s (%s)', $classInfo->fqcn, $classInfo->kind->label());
+    }
+
+    /**
+     * 循環1件分の表示行を作る。2ノードは `<->`、3ノード以上は先頭に戻る `->` チェーンで表す。
+     *
+     * @param list<string> $cycle
+     */
+    private function cycleLine(array $cycle): string
+    {
+        if (count($cycle) === 2) {
+            return sprintf('  - %s <-> %s', $cycle[0], $cycle[1]);
+        }
+
+        return '  - ' . implode(' -> ', $cycle) . ' -> ' . $cycle[0];
     }
 
     /**

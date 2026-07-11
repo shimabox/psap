@@ -18,11 +18,13 @@ final readonly class ReportData
     /**
      * @param list<ComponentMetrics> $componentMetrics
      * @param list<string> $warnings Analyzer が発したパース警告等
+     * @param list<list<string>> $cycles 循環依存（ADP違反）。各要素は循環しているコンポーネント名のリスト
      */
     public function __construct(
         public array $componentMetrics,
         public MetricsSummary $summary,
         public array $warnings,
+        public array $cycles = [],
     ) {
     }
 }
