@@ -15,6 +15,21 @@ use PHPUnit\Framework\TestCase;
 // Ca/Ce が依存エッジ数ではなく「クラス単位」でカウントされることを重点的に確認する。
 final class MetricsCalculatorTest extends TestCase
 {
+    public function testFqcnMatchingIsCaseInsensitive(): void
+    {
+        $source = new Component('App\\Source', [
+            new ClassInfo('App\\Source\\Consumer', TypeKind::ConcreteClass, '/Consumer.php', ['APP\\TARGET\\SERVICE']),
+        ]);
+        $target = new Component('App\\Target', [
+            new ClassInfo('App\\Target\\Service', TypeKind::ConcreteClass, '/Service.php', []),
+        ]);
+
+        $metrics = (new MetricsCalculator())->calculate([$source, $target]);
+
+        self::assertSame(1, $metrics[0]->ce);
+        self::assertSame(1, $metrics[1]->ca);
+    }
+
     public function testCalculatesCaAndCePerClassNotPerDependencyEdge(): void
     {
         // コンポーネントA: X, Y, Z

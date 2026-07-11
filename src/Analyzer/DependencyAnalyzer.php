@@ -70,12 +70,13 @@ final class DependencyAnalyzer
             }
 
             $nameResolver = new NameResolver();
+            $rootCollector = new RootClassLikeCollector($nameResolver);
             $traverser = new NodeTraverser();
             $traverser->addVisitor($nameResolver);
-            /** @var list<Stmt> $resolvedAst */
-            $resolvedAst = $traverser->traverse($ast);
+            $traverser->addVisitor($rootCollector);
+            $traverser->traverse($ast);
 
-            foreach ($this->extractClassInfos($resolvedAst, $filePath, $nameResolver->getNameContext()) as $classInfo) {
+            foreach ($this->extractClassInfos($rootCollector, $filePath) as $classInfo) {
                 $classInfos[] = $classInfo;
             }
         }
@@ -84,16 +85,10 @@ final class DependencyAnalyzer
     }
 
     /**
-     * @param list<Stmt> $ast
      * @return list<ClassInfo>
      */
-    private function extractClassInfos(array $ast, string $filePath, NameContext $nameContext): array
+    private function extractClassInfos(RootClassLikeCollector $rootCollector, string $filePath): array
     {
-        $rootCollector = new RootClassLikeCollector();
-        $traverser = new NodeTraverser();
-        $traverser->addVisitor($rootCollector);
-        $traverser->traverse($ast);
-
         $result = [];
         foreach ($rootCollector->roots as $root) {
             $fqcn = ($root->namespacedName ?? $root->name)?->toString();
@@ -102,6 +97,7 @@ final class DependencyAnalyzer
                 continue;
             }
 
+            $nameContext = $rootCollector->nameContexts[spl_object_id($root)];
             $result[] = new ClassInfo(
                 fqcn: $fqcn,
                 kind: $this->resolveKind($root),

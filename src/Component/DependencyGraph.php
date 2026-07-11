@@ -38,7 +38,7 @@ final readonly class DependencyGraph
             $fromName = $component->name;
             foreach ($component->classInfos as $classInfo) {
                 foreach ($classInfo->dependencies as $dependency) {
-                    $toName = $componentNameByFqcn[$dependency] ?? null;
+                    $toName = $componentNameByFqcn[strtolower($dependency)] ?? null;
                     if ($toName === null || $toName === $fromName) {
                         continue;
                     }
@@ -74,7 +74,7 @@ final readonly class DependencyGraph
         $map = [];
         foreach ($components as $component) {
             foreach ($component->classInfos as $classInfo) {
-                $map[$classInfo->fqcn] = $component->name;
+                $map[strtolower($classInfo->fqcn)] = $component->name;
             }
         }
 

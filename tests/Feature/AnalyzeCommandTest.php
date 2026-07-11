@@ -116,6 +116,30 @@ final class AnalyzeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exitCode);
     }
 
+    public function testInvalidDepthExitsWithInputErrorCode(): void
+    {
+        $tester = $this->commandTester();
+        $tester->execute(
+            ['paths' => [self::SIMPLE_PROJECT], '--depth' => 'not-a-number'],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::INVALID, $tester->getStatusCode());
+        self::assertStringContainsString('--depth', $tester->getErrorOutput());
+    }
+
+    public function testInvalidThresholdExitsWithInputErrorCode(): void
+    {
+        $tester = $this->commandTester();
+        $tester->execute(
+            ['paths' => [self::SIMPLE_PROJECT], '--threshold' => '1.1'],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::INVALID, $tester->getStatusCode());
+        self::assertStringContainsString('--threshold', $tester->getErrorOutput());
+    }
+
     public function testFailOnCycleExitsWithFailureCodeWhenCyclesExist(): void
     {
         $tester = $this->commandTester();
@@ -170,6 +194,20 @@ final class AnalyzeCommandTest extends TestCase
                 unlink($outputPath);
             }
         }
+    }
+
+    public function testUnwritableOutputPathExitsWithFailureCode(): void
+    {
+        $tester = $this->commandTester();
+        $outputPath = sys_get_temp_dir() . '/bobsap-missing-' . uniqid() . '/report.txt';
+
+        $tester->execute(
+            ['paths' => [self::SIMPLE_PROJECT], '--output' => $outputPath],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('出力ファイルに書き込めませんでした', $tester->getErrorOutput());
     }
 
     public function testExcludeOptionRemovesMatchingClassesFromOutput(): void

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Bobsap\Analyzer\Internal;
 
+use PhpParser\NameContext;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\ClassLike;
-use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\NodeVisitorAbstract;
 
 /**
@@ -22,15 +23,34 @@ final class RootClassLikeCollector extends NodeVisitorAbstract
     /** @var list<ClassLike> */
     public array $roots = [];
 
-    public function enterNode(Node $node): int|null
+    /** @var array<int, NameContext> ClassLike の object id → 宣言位置の名前解決コンテキスト */
+    public array $nameContexts = [];
+
+    private int $classLikeDepth = 0;
+
+    public function __construct(
+        private readonly NameResolver $nameResolver,
+    ) {
+    }
+
+    public function enterNode(Node $node): null
     {
         if ($node instanceof ClassLike) {
-            if ($node->name !== null) {
+            if ($this->classLikeDepth === 0 && $node->name !== null) {
                 $this->roots[] = $node;
+                $this->nameContexts[spl_object_id($node)] = clone $this->nameResolver->getNameContext();
             }
 
-            // 型宣言の内部（無名クラスの本体を含む）は別スコープなので踏み込まない
-            return NodeTraverser::DONT_TRAVERSE_CHILDREN;
+            $this->classLikeDepth++;
+        }
+
+        return null;
+    }
+
+    public function leaveNode(Node $node): null
+    {
+        if ($node instanceof ClassLike) {
+            $this->classLikeDepth--;
         }
 
         return null;

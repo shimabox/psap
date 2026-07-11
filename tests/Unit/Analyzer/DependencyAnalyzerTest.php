@@ -145,6 +145,40 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertSame(['Fixture\\DocblockProject\\Domain\\Product'], $order->dependencies);
     }
 
+    public function testDocblockAliasesUseTheContextOfEachNamespaceBlock(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace Fixture\First {
+                use Fixture\Catalog\Product as Item;
+                class Consumer
+                {
+                    /** @var Item */
+                    private mixed $item;
+                }
+            }
+            namespace Fixture\Second {
+                use Fixture\Other\WrongProduct as Item;
+                class OtherConsumer
+                {
+                    /** @var Item */
+                    private mixed $item;
+                }
+            }
+            PHP;
+
+        $result = $this->analyzeCode($code);
+
+        self::assertSame(
+            ['Fixture\\Catalog\\Product'],
+            $this->findByFqcn($result->classInfos, 'Fixture\\First\\Consumer')->dependencies,
+        );
+        self::assertSame(
+            ['Fixture\\Other\\WrongProduct'],
+            $this->findByFqcn($result->classInfos, 'Fixture\\Second\\OtherConsumer')->dependencies,
+        );
+    }
+
     // useDocblock: false を指定すると docblock は一切解析されない
     public function testUseDocblockFalseDisablesDocblockDependencyCollection(): void
     {

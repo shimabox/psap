@@ -122,14 +122,29 @@ final class AnalyzeCommand extends Command
 
         /** @var string $depthOption */
         $depthOption = $input->getOption('depth');
-        $depth = (int) $depthOption;
+        $depth = filter_var($depthOption, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($depth === false) {
+            $errorOutput->writeln(sprintf('<error>--depth には1以上の整数を指定してください: %s</error>', $depthOption));
+
+            return Command::INVALID;
+        }
 
         /** @var list<string> $excludePatterns */
         $excludePatterns = $input->getOption('exclude');
 
         /** @var string|null $thresholdOption */
         $thresholdOption = $input->getOption('threshold');
-        $threshold = $thresholdOption !== null ? (float) $thresholdOption : null;
+        $threshold = null;
+        if ($thresholdOption !== null) {
+            $parsedThreshold = filter_var($thresholdOption, FILTER_VALIDATE_FLOAT);
+            if ($parsedThreshold === false || !is_finite($parsedThreshold) || $parsedThreshold < 0.0 || $parsedThreshold > 1.0) {
+                $errorOutput->writeln(sprintf('<error>--threshold には0.0以上1.0以下の数値を指定してください: %s</error>', $thresholdOption));
+
+                return Command::INVALID;
+            }
+
+            $threshold = $parsedThreshold;
+        }
 
         /** @var bool $failOnCycle */
         $failOnCycle = $input->getOption('fail-on-cycle');
@@ -151,7 +166,11 @@ final class AnalyzeCommand extends Command
         /** @var string|null $outputPath */
         $outputPath = $input->getOption('output');
         if ($outputPath !== null) {
-            file_put_contents($outputPath, $rendered . PHP_EOL);
+            if (@file_put_contents($outputPath, $rendered . PHP_EOL) === false) {
+                $errorOutput->writeln(sprintf('<error>出力ファイルに書き込めませんでした: %s</error>', $outputPath));
+
+                return Command::FAILURE;
+            }
         } else {
             $output->writeln($rendered);
         }

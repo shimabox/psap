@@ -38,7 +38,7 @@ final class MetricsCalculator
         $map = [];
         foreach ($components as $component) {
             foreach ($component->classInfos as $classInfo) {
-                $map[$classInfo->fqcn] = $component->name;
+                $map[strtolower($classInfo->fqcn)] = $component->name;
             }
         }
 
@@ -129,7 +129,7 @@ final class MetricsCalculator
     private function dependsOnOutsideOf(ClassInfo $classInfo, string $ownComponentName, array $componentNameByFqcn): bool
     {
         foreach ($classInfo->dependencies as $dependency) {
-            $dependencyComponentName = $componentNameByFqcn[$dependency] ?? null;
+            $dependencyComponentName = $componentNameByFqcn[strtolower($dependency)] ?? null;
             if ($dependencyComponentName !== null && $dependencyComponentName !== $ownComponentName) {
                 return true;
             }
@@ -144,7 +144,7 @@ final class MetricsCalculator
     private function dependsOnComponent(ClassInfo $classInfo, string $targetComponentName, array $componentNameByFqcn): bool
     {
         foreach ($classInfo->dependencies as $dependency) {
-            if (($componentNameByFqcn[$dependency] ?? null) === $targetComponentName) {
+            if (($componentNameByFqcn[strtolower($dependency)] ?? null) === $targetComponentName) {
                 return true;
             }
         }
