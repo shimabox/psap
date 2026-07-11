@@ -323,6 +323,11 @@ make cs-fix  # コーディングスタイルを自動整形
 
 Makefile を経由せず直接叩く場合は `docker compose run --rm app composer test` のように実行します。
 
+### CI（GitHub Actions）
+
+`push`（main）と Pull Request で `.github/workflows/ci.yml` が走ります。`checks` ジョブは PHP 8.3 / 8.4 のマトリクスで `composer validate --strict` / `composer test` / `composer stan` / `composer cs` を実行し、成功後に `self-metrics` ジョブが bobsap 自身の `src/` を計測（ドッグフーディング）します。text / mermaid / plantuml / json の4形式を Artifact にアップロードし、`--fail-on-cycle` で循環依存がないこともゲートします。
+自己計測の結果（テキスト表と I/A の mermaid 図）は Actions の実行結果画面の Step Summary にそのまま表示されるので、ジョブを開くだけで確認できます。
+
 ### アーキテクチャ概要
 
 データフロー: `SourceFinder → DependencyAnalyzer → ClassInfo[] → ComponentClassifier → Component[] → MetricsCalculator → ComponentMetrics[] → Reporter`
