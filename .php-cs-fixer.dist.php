@@ -6,7 +6,10 @@ declare(strict_types=1);
 
 $finder = (new PhpCsFixer\Finder())
     ->in(__DIR__ . '/src')
-    ->in(__DIR__ . '/tests');
+    ->in(__DIR__ . '/tests')
+    // tests/Fixtures は解析対象データ（意図的な構文エラーファイルを含む）であり、
+    // プロダクトコードではないため cs-fixer の対象から除外する
+    ->exclude('Fixtures');
 
 return (new PhpCsFixer\Config())
     ->setRiskyAllowed(true)

@@ -1,0 +1,446 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Bobsap\Tests\Unit\Analyzer;
+
+use Bobsap\Analyzer\AnalysisResult;
+use Bobsap\Analyzer\ClassInfo;
+use Bobsap\Analyzer\DependencyAnalyzer;
+use Bobsap\Analyzer\SourceFinder;
+use Bobsap\Analyzer\TypeKind;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+
+// DependencyAnalyzer: 型種別の判定・依存関係抽出（数えるもの一式）・
+// グローバル名前空間・パースエラー時の警告とスキップ・無名クラスの扱いのテスト
+final class DependencyAnalyzerTest extends TestCase
+{
+    private const SIMPLE_PROJECT = __DIR__ . '/../../Fixtures/SimpleProject';
+    private const BROKEN_PROJECT = __DIR__ . '/../../Fixtures/BrokenProject';
+
+    /** @var list<string> */
+    private array $tempFiles = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tempFiles as $tempFile) {
+            if (is_file($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+        $this->tempFiles = [];
+    }
+
+    // --- 型種別の判定（5種すべて） ---
+
+    public function testDetectsAllFiveTypeKinds(): void
+    {
+        $classInfos = $this->analyzeFixtureProject(self::SIMPLE_PROJECT);
+
+        self::assertSame(TypeKind::Interface_, $this->findByFqcn($classInfos, 'Fixture\\App\\Domain\\Nameable')->kind);
+        self::assertSame(TypeKind::AbstractClass, $this->findByFqcn($classInfos, 'Fixture\\App\\Domain\\AbstractEntity')->kind);
+        self::assertSame(TypeKind::ConcreteClass, $this->findByFqcn($classInfos, 'Fixture\\App\\Domain\\EmailAddress')->kind);
+        self::assertSame(TypeKind::Enum_, $this->findByFqcn($classInfos, 'Fixture\\App\\Domain\\Status')->kind);
+        self::assertSame(TypeKind::Trait_, $this->findByFqcn($classInfos, 'Fixture\\App\\Domain\\HasTimestamps')->kind);
+    }
+
+    // --- 組み込みクラスへの依存はフィルタリングせずそのまま記録する ---
+
+    public function testBuiltinClassDependencyIsKeptAsIs(): void
+    {
+        $classInfos = $this->analyzeFixtureProject(self::SIMPLE_PROJECT);
+
+        $repositoryException = $this->findByFqcn($classInfos, 'Fixture\\App\\Infra\\RepositoryException');
+        self::assertSame(['Exception'], $repositoryException->dependencies);
+
+        $hasTimestamps = $this->findByFqcn($classInfos, 'Fixture\\App\\Domain\\HasTimestamps');
+        self::assertSame(['DateTimeImmutable'], $hasTimestamps->dependencies);
+    }
+
+    // --- グローバル名前空間 & 1ファイル複数型宣言 ---
+
+    public function testGlobalNamespaceAndMultipleDeclarationsPerFile(): void
+    {
+        $finder = new SourceFinder();
+        $analyzer = new DependencyAnalyzer();
+        $files = $finder->find([self::SIMPLE_PROJECT]);
+        $result = $analyzer->analyze($files);
+
+        $legacy = $this->findByFqcn($result->classInfos, 'LegacyGlobalThing');
+        $helper = $this->findByFqcn($result->classInfos, 'GlobalHelper');
+
+        self::assertSame(TypeKind::ConcreteClass, $legacy->kind);
+        self::assertSame(['GlobalHelper'], $legacy->dependencies);
+        self::assertSame(TypeKind::ConcreteClass, $helper->kind);
+        self::assertSame([], $helper->dependencies);
+    }
+
+    // --- パースエラーのファイルは例外を投げずスキップし、警告として収集する ---
+
+    public function testParseErrorIsCollectedAsWarningAndSkipped(): void
+    {
+        $finder = new SourceFinder();
+        $analyzer = new DependencyAnalyzer();
+        $files = $finder->find([self::BROKEN_PROJECT]);
+
+        $result = $analyzer->analyze($files);
+
+        self::assertNotEmpty($result->warnings);
+        self::assertStringContainsString('Broken.php', $result->warnings[0]);
+
+        // 壊れていないファイルは問題なく解析できる
+        $valid = $this->findByFqcn($result->classInfos, 'Fixture\\Broken\\Valid');
+        self::assertSame(TypeKind::ConcreteClass, $valid->kind);
+
+        // 壊れているファイル由来の ClassInfo は含まれない
+        self::assertNull($this->tryFindByFqcn($result->classInfos, 'Fixture\\Broken\\Broken'));
+    }
+
+    // --- 無名クラス: 宣言はClassInfoにならず、内部の依存も外側に伝播しない ---
+
+    public function testAnonymousClassIsNotCollectedAndItsDependenciesAreNotAttributedToOuterClass(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            declare(strict_types=1);
+            namespace Fixture\Cases;
+            interface Iface {}
+            class Inner {}
+            class Target
+            {
+                public function make(): object
+                {
+                    return new class implements Iface {
+                        private Inner $inner;
+                    };
+                }
+            }
+            PHP;
+
+        $result = $this->analyzeCode($code);
+
+        // Iface, Inner, Target の3件のみで、無名クラスはカウントされない
+        self::assertCount(3, $result->classInfos);
+
+        $target = $this->findByFqcn($result->classInfos, 'Fixture\\Cases\\Target');
+        self::assertSame([], $target->dependencies);
+    }
+
+    // --- 依存抽出（「数えるもの」を1パターンずつ） ---
+
+    /**
+     * @param list<string> $expectedDependencies
+     */
+    #[DataProvider('dependencyPatternProvider')]
+    public function testExtractsDependencyPattern(string $code, array $expectedDependencies): void
+    {
+        $result = $this->analyzeCode($code);
+
+        $target = $this->findByFqcn($result->classInfos, 'Fixture\\Cases\\Target');
+
+        self::assertEqualsCanonicalizing($expectedDependencies, $target->dependencies);
+    }
+
+    /**
+     * @return array<string, array{string, list<string>}>
+     */
+    public static function dependencyPatternProvider(): array
+    {
+        return [
+            'extends' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Base {}
+                    class Target extends Base {}
+                    PHP,
+                ['Fixture\\Cases\\Base'],
+            ],
+            'implements' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    interface Iface {}
+                    class Target implements Iface {}
+                    PHP,
+                ['Fixture\\Cases\\Iface'],
+            ],
+            'trait use' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    trait T {}
+                    class Target { use T; }
+                    PHP,
+                ['Fixture\\Cases\\T'],
+            ],
+            'プロパティ型宣言' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep {}
+                    class Target { private Dep $d; }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'nullable な引数型宣言' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep {}
+                    class Target { public function __construct(private ?Dep $d = null) {} }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'union型' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class A {}
+                    class B {}
+                    class Target { private A|B $x; }
+                    PHP,
+                ['Fixture\\Cases\\A', 'Fixture\\Cases\\B'],
+            ],
+            'intersection型' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    interface A {}
+                    interface B {}
+                    class Target { public function m(A&B $x): void {} }
+                    PHP,
+                ['Fixture\\Cases\\A', 'Fixture\\Cases\\B'],
+            ],
+            '戻り値型宣言' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep {}
+                    class Target { public function m(): Dep { return new Dep(); } }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'new X(...)' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep {}
+                    class Target { public function m(): void { new Dep(); } }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'X::method()（静的呼び出し）' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep { public static function m(): void {} }
+                    class Target { public function call(): void { Dep::m(); } }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'X::CONST（静的定数）' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep { public const FOO = 1; }
+                    class Target { public function get(): int { return Dep::FOO; } }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'X::class' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep {}
+                    class Target { public function name(): string { return Dep::class; } }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'instanceof' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep {}
+                    class Target { public function check(mixed $x): bool { return $x instanceof Dep; } }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            'catch（単一）' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class DepException extends \Exception {}
+                    class Target { public function run(): void { try { } catch (DepException $e) { throw $e; } } }
+                    PHP,
+                ['Fixture\\Cases\\DepException'],
+            ],
+            'catch（union）' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class DepExceptionA extends \Exception {}
+                    class DepExceptionB extends \Exception {}
+                    class Target { public function run(): void { try { } catch (DepExceptionA|DepExceptionB $e) { throw $e; } } }
+                    PHP,
+                ['Fixture\\Cases\\DepExceptionA', 'Fixture\\Cases\\DepExceptionB'],
+            ],
+            'アトリビュート #[X]' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    #[\Attribute]
+                    class DepAttribute {}
+                    #[DepAttribute]
+                    class Target {}
+                    PHP,
+                ['Fixture\\Cases\\DepAttribute'],
+            ],
+            'self / parent / static は除外' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Base {}
+                    class Target extends Base
+                    {
+                        public function usesSpecialNames(): static
+                        {
+                            $x = new self();
+                            $y = new parent();
+                            $z = new static();
+                            return $z;
+                        }
+                    }
+                    PHP,
+                ['Fixture\\Cases\\Base'],
+            ],
+            '組み込みスカラー型は依存として数えない' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Target
+                    {
+                        public function m(int $a, string $b, ?array $c, bool $d): void {}
+                    }
+                    PHP,
+                [],
+            ],
+            '組み込みクラスへの依存は保持する' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Target
+                    {
+                        private \DateTimeImmutable $createdAt;
+                        public function boom(): void { throw new \RuntimeException('x'); }
+                    }
+                    PHP,
+                ['DateTimeImmutable', 'RuntimeException'],
+            ],
+            '重複は排除される' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Dep {}
+                    class Target
+                    {
+                        private Dep $a;
+                        private Dep $b;
+                        public function m(Dep $x): Dep { return new Dep(); }
+                    }
+                    PHP,
+                ['Fixture\\Cases\\Dep'],
+            ],
+            '自分自身への参照は除外される' => [
+                <<<'PHP'
+                    <?php
+                    declare(strict_types=1);
+                    namespace Fixture\Cases;
+                    class Target
+                    {
+                        public function make(): self { return new self(); }
+                        private ?Target $child = null;
+                    }
+                    PHP,
+                [],
+            ],
+        ];
+    }
+
+    // --- ヘルパー ---
+
+    /**
+     * @return list<ClassInfo>
+     */
+    private function analyzeFixtureProject(string $directory): array
+    {
+        $finder = new SourceFinder();
+        $analyzer = new DependencyAnalyzer();
+        $files = $finder->find([$directory]);
+
+        return $analyzer->analyze($files)->classInfos;
+    }
+
+    private function analyzeCode(string $code): AnalysisResult
+    {
+        $path = $this->createTempFile($code);
+        $analyzer = new DependencyAnalyzer();
+
+        return $analyzer->analyze([$path]);
+    }
+
+    private function createTempFile(string $code): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'bobsap_') . '.php';
+        file_put_contents($path, $code);
+        $this->tempFiles[] = $path;
+
+        return $path;
+    }
+
+    /**
+     * @param list<ClassInfo> $classInfos
+     */
+    private function findByFqcn(array $classInfos, string $fqcn): ClassInfo
+    {
+        $found = $this->tryFindByFqcn($classInfos, $fqcn);
+        self::assertNotNull($found, sprintf('%s が見つかりませんでした', $fqcn));
+
+        return $found;
+    }
+
+    /**
+     * @param list<ClassInfo> $classInfos
+     */
+    private function tryFindByFqcn(array $classInfos, string $fqcn): ?ClassInfo
+    {
+        foreach ($classInfos as $classInfo) {
+            if ($classInfo->fqcn === $fqcn) {
+                return $classInfo;
+            }
+        }
+
+        return null;
+    }
+}

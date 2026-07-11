@@ -154,7 +154,7 @@ nikic/php-parser の `NameResolver` で FQCN 解決した上で:
   3. テスト先行（先にテストを書き、red → green を確認する）
   4. シンプルさ優先。凝った抽象化をしない
 - **各フェーズの完了条件**: `composer test`（phpunit）・`composer stan`（phpstan level max）・`composer cs`（php-cs-fixer dry-run）がすべて通ること + フェーズごとの受け入れ基準を満たすこと
-- **フェーズ完了ごとに git commit**（ユーザー確認の上）
+- **フェーズ完了ごとに git commit**（オーケストレーターの検証が通れば、ユーザー確認なしでコミットしてよい。2026-07-11 ユーザー指示）
 
 ---
 
@@ -230,3 +230,4 @@ TDD 対象。先に `tests/Fixtures/SimpleProject/` を作る（interface / abst
 （フェーズ完了時にここへ追記する。例: `2026-07-11 Phase 0 完了 (commit abc1234)`）
 
 - 2026-07-11 プラン作成
+- 2026-07-11 Phase 0 完了 (commit 0c4ee9d) — 残課題: php-cs-fixer 実行時の PHP 8.4 警告（無害、必要なら 8.3 に固定）

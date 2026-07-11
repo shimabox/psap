@@ -3,3 +3,7 @@ parameters:
     paths:
         - src
         - tests
+    # tests/Fixtures は解析対象データ（意図的な構文エラーファイルを含む）であり、
+    # プロダクトコードではないため phpstan の対象から除外する
+    excludePaths:
+        - tests/Fixtures/*
