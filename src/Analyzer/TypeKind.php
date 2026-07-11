@@ -29,4 +29,18 @@ enum TypeKind
             self::ConcreteClass, self::Enum_, self::Trait_ => false,
         };
     }
+
+    /**
+     * 表示用（テキスト表・JSON）の文字列表現。
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Interface_ => 'interface',
+            self::AbstractClass => 'abstract',
+            self::ConcreteClass => 'concrete',
+            self::Enum_ => 'enum',
+            self::Trait_ => 'trait',
+        };
+    }
 }

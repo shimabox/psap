@@ -30,4 +30,24 @@ final class TypeKindTest extends TestCase
             'trait は具象型' => [TypeKind::Trait_, false],
         ];
     }
+
+    #[DataProvider('labelProvider')]
+    public function testLabel(TypeKind $kind, string $expected): void
+    {
+        self::assertSame($expected, $kind->label());
+    }
+
+    /**
+     * @return array<string, array{TypeKind, string}>
+     */
+    public static function labelProvider(): array
+    {
+        return [
+            'interface' => [TypeKind::Interface_, 'interface'],
+            'abstract class' => [TypeKind::AbstractClass, 'abstract'],
+            'concrete class' => [TypeKind::ConcreteClass, 'concrete'],
+            'enum' => [TypeKind::Enum_, 'enum'],
+            'trait' => [TypeKind::Trait_, 'trait'],
+        ];
+    }
 }

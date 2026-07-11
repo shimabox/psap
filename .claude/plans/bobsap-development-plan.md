@@ -232,3 +232,5 @@ TDD 対象。先に `tests/Fixtures/SimpleProject/` を作る（interface / abst
 - 2026-07-11 プラン作成
 - 2026-07-11 Phase 0 完了 (commit 0c4ee9d) — 残課題: php-cs-fixer 実行時の PHP 8.4 警告（無害、必要なら 8.3 に固定）
 - 2026-07-11 Phase 1 完了 (commit 4362098) — 設計メモ: 組み込みクラスへの依存も Analyzer は記録する（フィルタは Phase 2 の責務）。無名クラスは宣言・依存とも収集しない。exclude パターンは探索ルートからの相対パスに fnmatch
+- 2026-07-11 Phase 2 完了 (commit 3b0bed7) — 設計メモ: ComponentMetrics のプロパティ名は instability/abstractness/distance（説明的な名前を採用）。孤立コンポーネントは I=0。グローバル名前空間は `(global)` コンポーネント。Zone 境界は厳密に < 0.5
+- 2026-07-11 Phase 3 完了（未コミット） — 設計メモ: Reporter は文字列を返すのみ（出力先書き込みは AnalyzeCommand の責務）。JSON の数値は丸め誤差対策で round(x, 4)。format→Reporter は配列マッピング（callable）で Phase 4 拡張しやすくした。exit code は symfony/console の Command::SUCCESS/FAILURE/INVALID(0/1/2) をそのまま利用。threshold 超過メッセージは stdout の JSON を汚染しないよう常に stderr へ出力。SimpleProject フィクスチャは namespace が `Fixture\App\...` なので depth=2（デフォルト）だと Domain/Infra/Generated が `Fixture\App` に統合される点に注意（depth=3 で分離）
