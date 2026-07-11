@@ -98,6 +98,23 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertNull($this->tryFindByFqcn($result->classInfos, 'Fixture\\Broken\\Broken'));
     }
 
+    public function testNameResolutionErrorIsCollectedAsWarningAndSkipped(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace Fixture\Cases;
+            use Fixture\One as Duplicate;
+            use Fixture\Two as Duplicate;
+            class Target {}
+            PHP;
+
+        $result = $this->analyzeCode($code);
+
+        self::assertCount(0, $result->classInfos);
+        self::assertCount(1, $result->warnings);
+        self::assertStringContainsString('名前解決エラーのためスキップしました', $result->warnings[0]);
+    }
+
     // --- 無名クラス: 宣言はClassInfoにならず、内部の依存も外側に伝播しない ---
 
     public function testAnonymousClassIsNotCollectedAndItsDependenciesAreNotAttributedToOuterClass(): void

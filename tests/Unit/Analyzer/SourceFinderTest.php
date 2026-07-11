@@ -6,6 +6,7 @@ namespace Bobsap\Tests\Unit\Analyzer;
 
 use Bobsap\Analyzer\SourceFinder;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 // SourceFinder: 指定ディレクトリからの .php 再帰列挙・exclude パターン・ソート順のテスト
 final class SourceFinderTest extends TestCase
@@ -89,6 +90,16 @@ final class SourceFinderTest extends TestCase
         self::assertContains('User.php', $paths);
         self::assertContains('Broken.php', $paths);
         self::assertContains('Valid.php', $paths);
+    }
+
+    public function testUnreadableDirectoryRaisesDescriptiveException(): void
+    {
+        $path = self::SIMPLE_PROJECT . '/DoesNotExist';
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ディレクトリを読み取れません: ' . $path);
+
+        (new SourceFinder())->find([$path]);
     }
 
     /**

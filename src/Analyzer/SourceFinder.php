@@ -7,7 +7,9 @@ namespace Bobsap\Analyzer;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use RuntimeException;
 use SplFileInfo;
+use UnexpectedValueException;
 
 /**
  * 指定ディレクトリ配下の .php ファイルを再帰的に列挙する。
@@ -47,30 +49,34 @@ final class SourceFinder
     private function findInDirectory(string $directory, array $excludePatterns): array
     {
         $realDirectory = realpath($directory);
-        if ($realDirectory === false) {
-            return [];
+        if ($realDirectory === false || !is_dir($realDirectory) || !is_readable($realDirectory)) {
+            throw new RuntimeException(sprintf('ディレクトリを読み取れません: %s', $directory));
         }
 
         $files = [];
 
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($realDirectory, FilesystemIterator::SKIP_DOTS),
-        );
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($realDirectory, FilesystemIterator::SKIP_DOTS),
+            );
 
-        foreach ($iterator as $fileInfo) {
-            /** @var SplFileInfo $fileInfo */
-            if ($fileInfo->getExtension() !== 'php') {
-                continue;
+            foreach ($iterator as $fileInfo) {
+                /** @var SplFileInfo $fileInfo */
+                if ($fileInfo->getExtension() !== 'php') {
+                    continue;
+                }
+
+                $path = $fileInfo->getPathname();
+                $relativePath = ltrim(substr($path, strlen($realDirectory)), DIRECTORY_SEPARATOR);
+
+                if ($this->isExcluded($relativePath, $excludePatterns)) {
+                    continue;
+                }
+
+                $files[] = $path;
             }
-
-            $path = $fileInfo->getPathname();
-            $relativePath = ltrim(substr($path, strlen($realDirectory)), DIRECTORY_SEPARATOR);
-
-            if ($this->isExcluded($relativePath, $excludePatterns)) {
-                continue;
-            }
-
-            $files[] = $path;
+        } catch (UnexpectedValueException $e) {
+            throw new RuntimeException(sprintf('ディレクトリを読み取れません: %s', $directory), previous: $e);
         }
 
         return $files;

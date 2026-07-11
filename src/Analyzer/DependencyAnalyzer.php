@@ -69,15 +69,19 @@ final class DependencyAnalyzer
                 continue;
             }
 
-            $nameResolver = new NameResolver();
-            $rootCollector = new RootClassLikeCollector($nameResolver);
-            $traverser = new NodeTraverser();
-            $traverser->addVisitor($nameResolver);
-            $traverser->addVisitor($rootCollector);
-            $traverser->traverse($ast);
+            try {
+                $nameResolver = new NameResolver();
+                $rootCollector = new RootClassLikeCollector($nameResolver);
+                $traverser = new NodeTraverser();
+                $traverser->addVisitor($nameResolver);
+                $traverser->addVisitor($rootCollector);
+                $traverser->traverse($ast);
 
-            foreach ($this->extractClassInfos($rootCollector, $filePath) as $classInfo) {
-                $classInfos[] = $classInfo;
+                foreach ($this->extractClassInfos($rootCollector, $filePath) as $classInfo) {
+                    $classInfos[] = $classInfo;
+                }
+            } catch (Error $e) {
+                $warnings[] = sprintf('名前解決エラーのためスキップしました: %s (%s)', $filePath, $e->getMessage());
             }
         }
 

@@ -29,7 +29,7 @@ final readonly class ClassInfo
         $this->dependencies = $dependencies
             |> (fn (array $items): array => array_filter(
                 $items,
-                fn (string $dependency): bool => $dependency !== $this->fqcn,
+                fn (string $dependency): bool => strcasecmp($dependency, $this->fqcn) !== 0,
             ))
             |> array_unique(...)
             |> array_values(...);

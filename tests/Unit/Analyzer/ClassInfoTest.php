@@ -39,6 +39,18 @@ final class ClassInfoTest extends TestCase
         self::assertSame(['App\\Domain\\Address'], $classInfo->dependencies);
     }
 
+    public function testSelfReferenceIsExcludedCaseInsensitively(): void
+    {
+        $classInfo = new ClassInfo(
+            fqcn: 'App\\Domain\\User',
+            kind: TypeKind::ConcreteClass,
+            filePath: '/path/to/User.php',
+            dependencies: ['APP\\DOMAIN\\USER', 'App\\Domain\\Address'],
+        );
+
+        self::assertSame(['App\\Domain\\Address'], $classInfo->dependencies);
+    }
+
     public function testHoldsBasicProperties(): void
     {
         $classInfo = new ClassInfo(

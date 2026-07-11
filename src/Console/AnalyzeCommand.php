@@ -18,6 +18,7 @@ use Bobsap\Report\PlantUmlReporter;
 use Bobsap\Report\ReportData;
 use Bobsap\Report\ReporterInterface;
 use Bobsap\Report\TextReporter;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -152,7 +153,13 @@ final class AnalyzeCommand extends Command
         /** @var bool $noDocblock */
         $noDocblock = $input->getOption('no-docblock');
 
-        $files = (new SourceFinder())->find($paths, $excludePatterns);
+        try {
+            $files = (new SourceFinder())->find($paths, $excludePatterns);
+        } catch (RuntimeException $e) {
+            $errorOutput->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+
+            return Command::INVALID;
+        }
         $analysisResult = (new DependencyAnalyzer(useDocblock: !$noDocblock))->analyze($files);
         $components = (new ComponentClassifier())->classify($analysisResult->classInfos, $depth);
         $componentMetrics = (new MetricsCalculator())->calculate($components);
