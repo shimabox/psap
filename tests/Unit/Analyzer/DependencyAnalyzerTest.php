@@ -7,6 +7,7 @@ namespace Bobsap\Tests\Unit\Analyzer;
 use Bobsap\Analyzer\AnalysisResult;
 use Bobsap\Analyzer\ClassInfo;
 use Bobsap\Analyzer\DependencyAnalyzer;
+use Bobsap\Analyzer\DependencyKind;
 use Bobsap\Analyzer\SourceFinder;
 use Bobsap\Analyzer\TypeKind;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -280,6 +281,63 @@ final class DependencyAnalyzerTest extends TestCase
         $target = $this->findByFqcn($result->classInfos, 'Fixture\\Cases\\Target');
 
         self::assertEqualsCanonicalizing($expectedDependencies, $target->dependencies);
+    }
+
+    public function testRecordsSyntaxKindRelativeFileAndLineForDependencies(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace Fixture\Cases;
+            #[\Attribute] class Marker {}
+            class Base {}
+            interface Contract {}
+            trait HelperTrait {}
+            class Dep { public const VALUE = 1; public static int $value; public static function run(): void {} }
+            class Failure extends \RuntimeException {}
+            class DocVar {}
+            class DocParam {}
+            class DocReturn {}
+            class DocFailure extends \RuntimeException {}
+            #[Marker]
+            class Target extends Base implements Contract
+            {
+                use HelperTrait;
+                private Dep $dependency;
+                /** @var DocVar */
+                private mixed $documented;
+                /**
+                 * @param DocParam $input
+                 * @return DocReturn
+                 * @throws DocFailure
+                 */
+                public function execute(Dep $dependency, mixed $input): Dep
+                {
+                    Dep::run();
+                    Dep::$value;
+                    Dep::VALUE;
+                    $dependency instanceof Dep;
+                    try {} catch (Failure $failure) {}
+                    return new Dep();
+                }
+            }
+            PHP;
+        $path = $this->createTempFile($code);
+        $result = (new DependencyAnalyzer(sourceRoots: [dirname($path)]))->analyze([$path]);
+        $target = $this->findByFqcn($result->classInfos, 'Fixture\\Cases\\Target');
+
+        $actualKinds = array_map(
+            static fn ($evidence): string => $evidence->kind->value,
+            $target->dependencyEvidence,
+        );
+        $expectedKinds = array_map(
+            static fn (DependencyKind $kind): string => $kind->value,
+            DependencyKind::cases(),
+        );
+        self::assertEqualsCanonicalizing($expectedKinds, array_values(array_unique($actualKinds)));
+        foreach ($target->dependencyEvidence as $evidence) {
+            self::assertSame(basename($path), $evidence->file);
+            self::assertGreaterThan(0, $evidence->line);
+        }
     }
 
     /**

@@ -153,12 +153,24 @@ final class TextReporterTest extends TestCase
                 [
                     'from' => 'App\\Domain',
                     'to' => 'App\\Infra',
-                    'classDependencies' => [['from' => 'App\\Domain\\Order', 'to' => 'App\\Infra\\Repository']],
+                    'classDependencies' => [[
+                        'from' => 'App\\Domain\\Order',
+                        'to' => 'App\\Infra\\Repository',
+                        'evidence' => [[
+                            'kind' => 'parameter_type',
+                            'file' => 'Domain/Order.php',
+                            'line' => 12,
+                        ]],
+                    ]],
                 ],
                 [
                     'from' => 'App\\Infra',
                     'to' => 'App\\Domain',
-                    'classDependencies' => [['from' => 'App\\Infra\\Repository', 'to' => 'App\\Domain\\Order']],
+                    'classDependencies' => [[
+                        'from' => 'App\\Infra\\Repository',
+                        'to' => 'App\\Domain\\Order',
+                        'evidence' => [],
+                    ]],
                 ],
             ],
         );
@@ -170,6 +182,7 @@ final class TextReporterTest extends TestCase
         self::assertStringContainsString('Representative shortest path: App\\Domain -> App\\Infra -> App\\Domain', $output);
         self::assertStringContainsString('2 components, peer namespaces', $output);
         self::assertStringContainsString('App\\Domain\\Order -> App\\Infra\\Repository', $output);
+        self::assertStringContainsString('parameter_type at Domain/Order.php:12', $output);
         self::assertStringContainsString('App\\Infra\\Repository -> App\\Domain\\Order', $output);
         // 統計行の後にセクションが出ること
         $statisticsPosition = strpos($output, 'Statistics: mean(D)=');

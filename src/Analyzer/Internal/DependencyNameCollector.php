@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bobsap\Analyzer\Internal;
 
+use Bobsap\Analyzer\DependencyKind;
 use PhpParser\NameContext;
 use PhpParser\Node;
 use PhpParser\Node\ComplexType;
@@ -20,23 +21,17 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 
 /**
- * 1つの型宣言（$root）の subtree から依存先の FQCN 文字列を集める。
+ * 1つの型宣言から依存先と、その依存を作った構文の種類・行番号を集める。
  *
- * NameResolver 適用後の AST を前提とし、解決済みの Name ノードから FQCN を取り出す。
- * self / parent / static は依存として数えない。
- * 入れ子の型宣言（無名クラスの本体等）は別スコープなので、そこに現れる依存は
- * $root の依存としては拾わない（境界で探索を止める）。
- *
- * docblock 解析（$docblockExtractor と $nameContext の両方が渡されたときだけ有効）は
- * プロパティの `@var` とメソッドの `@param` / `@return` / `@throws` を対象にする。
- * docblock 内の短縮名は $nameContext（NameResolver::getNameContext()）で FQCN 解決する。
+ * NameResolver適用後のASTを前提とし、self / parent / staticと入れ子の型宣言は除外する。
+ * docblock内の短縮名は宣言位置のNameContextでFQCNへ解決する。
  *
  * @internal DependencyAnalyzer の実装詳細
  */
 final class DependencyNameCollector extends NodeVisitorAbstract
 {
-    /** @var list<string> */
-    public array $names = [];
+    /** @var list<DependencyReference> */
+    public array $references = [];
 
     public function __construct(
         private readonly ClassLike $root,
@@ -51,171 +46,161 @@ final class DependencyNameCollector extends NodeVisitorAbstract
             return NodeTraverser::DONT_TRAVERSE_CHILDREN;
         }
 
-        foreach ($this->extractFrom($node) as $name) {
-            $this->names[] = $name;
+        foreach ($this->extractFrom($node) as $reference) {
+            $this->references[] = $reference;
         }
 
         return null;
     }
 
     /**
-     * @return list<string>
+     * @return list<DependencyReference>
      */
     private function extractFrom(Node $node): array
     {
+        if ($node instanceof Node\Attribute) {
+            return $this->reference($node->name, DependencyKind::Attribute);
+        }
+
         if ($node instanceof ClassLike) {
-            $names = $this->namesFromAttributeGroups($node->attrGroups);
+            $references = [];
 
             if ($node instanceof Stmt\Class_) {
                 if ($node->extends !== null) {
-                    $this->appendName($names, $node->extends);
+                    $this->appendName($references, $node->extends, DependencyKind::Extends);
                 }
                 foreach ($node->implements as $interface) {
-                    $this->appendName($names, $interface);
+                    $this->appendName($references, $interface, DependencyKind::Implements);
                 }
             } elseif ($node instanceof Stmt\Interface_) {
                 foreach ($node->extends as $interface) {
-                    $this->appendName($names, $interface);
+                    $this->appendName($references, $interface, DependencyKind::Extends);
                 }
             } elseif ($node instanceof Stmt\Enum_) {
                 foreach ($node->implements as $interface) {
-                    $this->appendName($names, $interface);
+                    $this->appendName($references, $interface, DependencyKind::Implements);
                 }
             }
 
-            return $names;
+            return $references;
         }
 
         if ($node instanceof Stmt\TraitUse) {
-            $names = [];
+            $references = [];
             foreach ($node->traits as $trait) {
-                $this->appendName($names, $trait);
+                $this->appendName($references, $trait, DependencyKind::TraitUse);
             }
 
-            return $names;
+            return $references;
         }
 
         if ($node instanceof Stmt\Property) {
-            $names = $this->namesFromAttributeGroups($node->attrGroups);
-            $this->appendType($names, $node->type);
-            $names = [...$names, ...$this->namesFromVarDocblock($node)];
+            $references = [];
+            $this->appendType($references, $node->type, DependencyKind::PropertyType);
 
-            return $names;
+            return [...$references, ...$this->referencesFromVarDocblock($node)];
         }
 
         if ($node instanceof Param) {
-            $names = $this->namesFromAttributeGroups($node->attrGroups);
-            $this->appendType($names, $node->type);
+            $references = [];
+            $this->appendType($references, $node->type, DependencyKind::ParameterType);
 
-            return $names;
+            return $references;
         }
 
         if ($node instanceof Stmt\ClassMethod) {
-            $names = $this->namesFromAttributeGroups($node->attrGroups);
-            $this->appendType($names, $node->returnType);
-            $names = [...$names, ...$this->namesFromMethodDocblock($node)];
+            $references = [];
+            $this->appendType($references, $node->returnType, DependencyKind::ReturnType);
 
-            return $names;
+            return [...$references, ...$this->referencesFromMethodDocblock($node)];
         }
 
-        if ($node instanceof Expr\Closure) {
-            $names = $this->namesFromAttributeGroups($node->attrGroups);
-            $this->appendType($names, $node->returnType);
+        if ($node instanceof Expr\Closure || $node instanceof Expr\ArrowFunction) {
+            $references = [];
+            $this->appendType($references, $node->returnType, DependencyKind::ReturnType);
 
-            return $names;
-        }
-
-        if ($node instanceof Expr\ArrowFunction) {
-            $names = $this->namesFromAttributeGroups($node->attrGroups);
-            $this->appendType($names, $node->returnType);
-
-            return $names;
+            return $references;
         }
 
         if ($node instanceof Expr\New_) {
-            $names = [];
-            if ($node->class instanceof Name) {
-                $this->appendName($names, $node->class);
-            }
-
-            return $names;
+            return $node->class instanceof Name
+                ? $this->reference($node->class, DependencyKind::New)
+                : [];
         }
 
         if ($node instanceof Expr\StaticCall) {
-            $names = [];
-            if ($node->class instanceof Name) {
-                $this->appendName($names, $node->class);
-            }
-
-            return $names;
+            return $node->class instanceof Name
+                ? $this->reference($node->class, DependencyKind::StaticCall)
+                : [];
         }
 
         if ($node instanceof Expr\StaticPropertyFetch) {
-            $names = [];
-            if ($node->class instanceof Name) {
-                $this->appendName($names, $node->class);
-            }
-
-            return $names;
+            return $node->class instanceof Name
+                ? $this->reference($node->class, DependencyKind::StaticProperty)
+                : [];
         }
 
         if ($node instanceof Expr\ClassConstFetch) {
-            $names = [];
-            if ($node->class instanceof Name) {
-                $this->appendName($names, $node->class);
-            }
-
-            return $names;
+            return $node->class instanceof Name
+                ? $this->reference($node->class, DependencyKind::ClassConstant)
+                : [];
         }
 
         if ($node instanceof Expr\Instanceof_) {
-            $names = [];
-            if ($node->class instanceof Name) {
-                $this->appendName($names, $node->class);
-            }
-
-            return $names;
+            return $node->class instanceof Name
+                ? $this->reference($node->class, DependencyKind::Instanceof)
+                : [];
         }
 
         if ($node instanceof Stmt\Catch_) {
-            $names = [];
+            $references = [];
             foreach ($node->types as $type) {
-                $this->appendName($names, $type);
+                $this->appendName($references, $type, DependencyKind::Catch);
             }
 
-            return $names;
+            return $references;
         }
 
         return [];
     }
 
     /**
-     * @param list<string> $names
+     * @return list<DependencyReference>
      */
-    private function appendName(array &$names, Name $name): void
+    private function reference(Name $name, DependencyKind $kind): array
+    {
+        $references = [];
+        $this->appendName($references, $name, $kind);
+
+        return $references;
+    }
+
+    /**
+     * @param list<DependencyReference> $references
+     */
+    private function appendName(array &$references, Name $name, DependencyKind $kind): void
     {
         if ($name->isSpecialClassName()) {
-            // self / parent / static は依存として数えない
             return;
         }
 
-        $names[] = $name->toString();
+        $references[] = new DependencyReference($name->toString(), $kind, $name->getStartLine());
     }
 
     /**
-     * @param list<string> $names
+     * @param list<DependencyReference> $references
      */
-    private function appendType(array &$names, ComplexType|Name|Identifier|null $type): void
-    {
+    private function appendType(
+        array &$references,
+        ComplexType|Name|Identifier|null $type,
+        DependencyKind $kind,
+    ): void {
         foreach ($this->flattenType($type) as $name) {
-            $this->appendName($names, $name);
+            $this->appendName($references, $name, $kind);
         }
     }
 
     /**
-     * 型宣言（nullable / union / intersection）を分解し、依存先候補の Name 一覧にする。
-     * int / string 等の組み込みスカラー型は Identifier ノードになるため、ここで自然に除外される。
-     *
      * @return list<Name>
      */
     private function flattenType(ComplexType|Name|Identifier|null $type): array
@@ -223,15 +208,12 @@ final class DependencyNameCollector extends NodeVisitorAbstract
         if ($type === null || $type instanceof Identifier) {
             return [];
         }
-
         if ($type instanceof Name) {
             return [$type];
         }
-
         if ($type instanceof NullableType) {
             return $this->flattenType($type->type);
         }
-
         if ($type instanceof UnionType || $type instanceof IntersectionType) {
             $names = [];
             foreach ($type->types as $inner) {
@@ -245,11 +227,9 @@ final class DependencyNameCollector extends NodeVisitorAbstract
     }
 
     /**
-     * プロパティの `@var` docblock からクラス名候補の FQCN を集める。
-     *
-     * @return list<string>
+     * @return list<DependencyReference>
      */
-    private function namesFromVarDocblock(Stmt\Property $node): array
+    private function referencesFromVarDocblock(Stmt\Property $node): array
     {
         if ($this->docblockExtractor === null || $this->nameContext === null) {
             return [];
@@ -260,16 +240,17 @@ final class DependencyNameCollector extends NodeVisitorAbstract
             return [];
         }
 
-        return $this->docblockExtractor->extractVarTypeNames($doc->getText(), $this->nameContext);
+        return $this->referencesFromNames(
+            $this->docblockExtractor->extractVarTypeNames($doc->getText(), $this->nameContext),
+            DependencyKind::DocblockVar,
+            $doc->getStartLine(),
+        );
     }
 
     /**
-     * メソッドの docblock から `@return`、`@throws`、各引数の `@param` のクラス名候補を集める。
-     * コンストラクタのプロモートされた引数もここで拾える（docblock はメソッド側に書かれるため）。
-     *
-     * @return list<string>
+     * @return list<DependencyReference>
      */
-    private function namesFromMethodDocblock(Stmt\ClassMethod $node): array
+    private function referencesFromMethodDocblock(Stmt\ClassMethod $node): array
     {
         if ($this->docblockExtractor === null || $this->nameContext === null) {
             return [];
@@ -281,38 +262,47 @@ final class DependencyNameCollector extends NodeVisitorAbstract
         }
 
         $docText = $doc->getText();
-        $names = [
-            ...$this->docblockExtractor->extractReturnTypeNames($docText, $this->nameContext),
-            ...$this->docblockExtractor->extractThrowsTypeNames($docText, $this->nameContext),
+        $line = $doc->getStartLine();
+        $references = [
+            ...$this->referencesFromNames(
+                $this->docblockExtractor->extractReturnTypeNames($docText, $this->nameContext),
+                DependencyKind::DocblockReturn,
+                $line,
+            ),
+            ...$this->referencesFromNames(
+                $this->docblockExtractor->extractThrowsTypeNames($docText, $this->nameContext),
+                DependencyKind::DocblockThrows,
+                $line,
+            ),
         ];
 
         foreach ($node->getParams() as $param) {
             if (!$param->var instanceof Expr\Variable || !is_string($param->var->name)) {
                 continue;
             }
-
-            $names = [
-                ...$names,
-                ...$this->docblockExtractor->extractParamTypeNames($docText, $param->var->name, $this->nameContext),
+            $references = [
+                ...$references,
+                ...$this->referencesFromNames(
+                    $this->docblockExtractor->extractParamTypeNames($docText, $param->var->name, $this->nameContext),
+                    DependencyKind::DocblockParam,
+                    $line,
+                ),
             ];
         }
 
-        return $names;
+        return $references;
     }
 
     /**
-     * @param array<Node\AttributeGroup> $attrGroups
-     * @return list<string>
+     * @param list<string> $names
+     * @return list<DependencyReference>
      */
-    private function namesFromAttributeGroups(array $attrGroups): array
+    private function referencesFromNames(array $names, DependencyKind $kind, int $line): array
     {
-        $names = [];
-        foreach ($attrGroups as $group) {
-            foreach ($group->attrs as $attribute) {
-                $this->appendName($names, $attribute->name);
-            }
-        }
-
-        return $names;
+        return array_map(
+            static fn (string $name): DependencyReference => new DependencyReference($name, $kind, $line),
+            $names,
+        );
     }
+
 }

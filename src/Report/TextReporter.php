@@ -17,6 +17,7 @@ use Bobsap\Metrics\Zone;
 final class TextReporter implements ReporterInterface
 {
     private const int CYCLE_EVIDENCE_LIMIT = 3;
+    private const int DEPENDENCY_SOURCE_LIMIT = 3;
 
     /** ゾーン警告なしの通常行に合わせて数値列の幅を揃えるための最小幅（"0.00" 形式は常に4桁） */
     private const int DECIMAL_COLUMN_WIDTH = 4;
@@ -78,8 +79,29 @@ final class TextReporter implements ReporterInterface
                 foreach ($cycle['dependencies'] as $dependency) {
                     $lines[] = sprintf('      %s -> %s', $dependency['from'], $dependency['to']);
                     $visibleEvidence = array_slice($dependency['classDependencies'], 0, self::CYCLE_EVIDENCE_LIMIT);
-                    foreach ($visibleEvidence as $evidence) {
-                        $lines[] = sprintf('        - %s -> %s', $evidence['from'], $evidence['to']);
+                    foreach ($visibleEvidence as $classDependency) {
+                        $lines[] = sprintf(
+                            '        - %s -> %s',
+                            $classDependency['from'],
+                            $classDependency['to'],
+                        );
+                        $visibleSources = array_slice(
+                            $classDependency['evidence'],
+                            0,
+                            self::DEPENDENCY_SOURCE_LIMIT,
+                        );
+                        foreach ($visibleSources as $source) {
+                            $lines[] = sprintf(
+                                '          %s at %s:%d',
+                                $source['kind'],
+                                $source['file'],
+                                $source['line'],
+                            );
+                        }
+                        $remainingSources = count($classDependency['evidence']) - count($visibleSources);
+                        if ($remainingSources > 0) {
+                            $lines[] = sprintf('          ... and %d more sources', $remainingSources);
+                        }
                     }
 
                     $remaining = count($dependency['classDependencies']) - count($visibleEvidence);

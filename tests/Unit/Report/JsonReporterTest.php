@@ -19,7 +19,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * JsonReporter のJSONスキーマを固定するテスト。
  *
- * @phpstan-type ClassDependency array{from: string, to: string}
+ * @phpstan-type Evidence array{kind: string, file: string, line: int}
+ * @phpstan-type ClassDependency array{from: string, to: string, evidence: list<Evidence>}
  * @phpstan-type Dependency array{from: string, to: string, classDependencies: list<ClassDependency>}
  * @phpstan-type CycleGroup array{
  *     components: list<string>,
@@ -148,12 +149,20 @@ final class JsonReporterTest extends TestCase
                 [
                     'from' => 'App\\Domain',
                     'to' => 'App\\Infra',
-                    'classDependencies' => [['from' => 'App\\Domain\\Order', 'to' => 'App\\Infra\\Repository']],
+                    'classDependencies' => [[
+                        'from' => 'App\\Domain\\Order',
+                        'to' => 'App\\Infra\\Repository',
+                        'evidence' => [],
+                    ]],
                 ],
                 [
                     'from' => 'App\\Infra',
                     'to' => 'App\\Domain',
-                    'classDependencies' => [['from' => 'App\\Infra\\Repository', 'to' => 'App\\Domain\\Order']],
+                    'classDependencies' => [[
+                        'from' => 'App\\Infra\\Repository',
+                        'to' => 'App\\Domain\\Order',
+                        'evidence' => [],
+                    ]],
                 ],
             ],
         );
@@ -202,6 +211,11 @@ final class JsonReporterTest extends TestCase
                 'classDependencies' => [[
                     'from' => 'App\\Domain\\User',
                     'to' => 'App\\Infra\\UserRepository',
+                    'evidence' => [[
+                        'kind' => 'new',
+                        'file' => 'Domain/User.php',
+                        'line' => 24,
+                    ]],
                 ]],
             ]],
         );
@@ -210,6 +224,7 @@ final class JsonReporterTest extends TestCase
         $decoded = $this->decode((new JsonReporter())->render($data));
 
         self::assertSame($graph->edgeDetails, $decoded['dependencies']);
+        self::assertSame('new', $decoded['dependencies'][0]['classDependencies'][0]['evidence'][0]['kind']);
     }
 
     public function testEncodesEmptyCyclesArrayWhenNoCyclesExist(): void

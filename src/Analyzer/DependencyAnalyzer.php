@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bobsap\Analyzer;
 
 use Bobsap\Analyzer\Internal\DependencyNameCollector;
+use Bobsap\Analyzer\Internal\DependencyReference;
 use Bobsap\Analyzer\Internal\DocblockTypeExtractor;
 use Bobsap\Analyzer\Internal\RootClassLikeCollector;
 use PhpParser\Error;
@@ -27,18 +28,34 @@ use PhpParser\ParserFactory;
  * 「解析対象外への依存を無視する」判断は Phase 2（メトリクス計算）の責務。
  *
  * $useDocblock（デフォルト true）を有効にすると、プロパティの `@var` とメソッドの
-     * `@param` / `@return` / `@throws` からもクラス名候補を収集する（`--no-docblock` で無効化できる）。
+ * `@param` / `@return` / `@throws` からもクラス名候補を収集する（`--no-docblock` で無効化できる）。
  * 短縮名の解決には NameResolver が保持する NameContext をそのまま使う。
  */
 final class DependencyAnalyzer
 {
     private readonly Parser $parser;
     private readonly ?DocblockTypeExtractor $docblockExtractor;
+    /** @var list<string> */
+    private readonly array $sourceRoots;
 
-    public function __construct(?Parser $parser = null, bool $useDocblock = true)
+    /**
+     * @param list<string> $sourceRoots 依存根拠のファイルパスを相対化する基準
+     */
+    public function __construct(?Parser $parser = null, bool $useDocblock = true, array $sourceRoots = [])
     {
         $this->parser = $parser ?? (new ParserFactory())->createForNewestSupportedVersion();
         $this->docblockExtractor = $useDocblock ? new DocblockTypeExtractor() : null;
+        $roots = array_map(
+            static function (string $path): string {
+                $normalized = realpath($path) ?: $path;
+                $trimmed = rtrim($normalized, DIRECTORY_SEPARATOR);
+
+                return $trimmed === '' ? DIRECTORY_SEPARATOR : $trimmed;
+            },
+            $sourceRoots,
+        );
+        usort($roots, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+        $this->sourceRoots = array_values(array_unique($roots));
     }
 
     /**
@@ -122,6 +139,7 @@ final class DependencyAnalyzer
                 kind: $existing->kind,
                 filePath: $existing->filePath,
                 dependencies: [...$existing->dependencies, ...$classInfo->dependencies],
+                dependencyEvidence: [...$existing->dependencyEvidence, ...$classInfo->dependencyEvidence],
             );
         }
 
@@ -142,11 +160,24 @@ final class DependencyAnalyzer
             }
 
             $nameContext = $rootCollector->nameContexts[spl_object_id($root)];
+            $references = $this->collectDependencyReferences($root, $nameContext);
             $result[] = new ClassInfo(
                 fqcn: $fqcn,
                 kind: $this->resolveKind($root),
                 filePath: $filePath,
-                dependencies: $this->collectDependencyNames($root, $nameContext),
+                dependencies: array_map(
+                    static fn (DependencyReference $reference): string => $reference->fqcn,
+                    $references,
+                ),
+                dependencyEvidence: array_map(
+                    fn (DependencyReference $reference): DependencyEvidence => new DependencyEvidence(
+                        targetFqcn: $reference->fqcn,
+                        kind: $reference->kind,
+                        file: $this->relativeFilePath($filePath),
+                        line: $reference->line,
+                    ),
+                    $references,
+                ),
             );
         }
 
@@ -165,15 +196,30 @@ final class DependencyAnalyzer
     }
 
     /**
-     * @return list<string>
+     * @return list<DependencyReference>
      */
-    private function collectDependencyNames(ClassLike $root, NameContext $nameContext): array
+    private function collectDependencyReferences(ClassLike $root, NameContext $nameContext): array
     {
         $collector = new DependencyNameCollector($root, $this->docblockExtractor, $nameContext);
         $traverser = new NodeTraverser();
         $traverser->addVisitor($collector);
         $traverser->traverse([$root]);
 
-        return $collector->names;
+        return $collector->references;
+    }
+
+    private function relativeFilePath(string $filePath): string
+    {
+        $normalizedFile = realpath($filePath) ?: $filePath;
+        foreach ($this->sourceRoots as $root) {
+            if ($normalizedFile === $root) {
+                return basename($normalizedFile);
+            }
+            if (str_starts_with($normalizedFile, $root . DIRECTORY_SEPARATOR)) {
+                return str_replace(DIRECTORY_SEPARATOR, '/', substr($normalizedFile, strlen($root) + 1));
+            }
+        }
+
+        return str_replace(DIRECTORY_SEPARATOR, '/', $filePath);
     }
 }

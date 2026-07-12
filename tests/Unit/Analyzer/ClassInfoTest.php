@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Bobsap\Tests\Unit\Analyzer;
 
 use Bobsap\Analyzer\ClassInfo;
+use Bobsap\Analyzer\DependencyEvidence;
+use Bobsap\Analyzer\DependencyKind;
 use Bobsap\Analyzer\TypeKind;
 use PHPUnit\Framework\TestCase;
 
@@ -64,5 +66,44 @@ final class ClassInfoTest extends TestCase
         self::assertSame(TypeKind::Interface_, $classInfo->kind);
         self::assertSame('/path/to/User.php', $classInfo->filePath);
         self::assertSame([], $classInfo->dependencies);
+    }
+
+    public function testEvidenceAddsDependencyAndIsDeduplicated(): void
+    {
+        $evidence = new DependencyEvidence(
+            'App\\Infra\\Repository',
+            DependencyKind::ParameterType,
+            'src/Domain/User.php',
+            12,
+        );
+        $classInfo = new ClassInfo(
+            fqcn: 'App\\Domain\\User',
+            kind: TypeKind::ConcreteClass,
+            filePath: '/path/to/User.php',
+            dependencies: [],
+            dependencyEvidence: [$evidence, $evidence],
+        );
+
+        self::assertSame(['App\\Infra\\Repository'], $classInfo->dependencies);
+        self::assertSame([$evidence], $classInfo->dependencyEvidence);
+    }
+
+    public function testSelfReferenceEvidenceIsExcluded(): void
+    {
+        $classInfo = new ClassInfo(
+            fqcn: 'App\\Domain\\User',
+            kind: TypeKind::ConcreteClass,
+            filePath: '/path/to/User.php',
+            dependencies: [],
+            dependencyEvidence: [new DependencyEvidence(
+                'APP\\DOMAIN\\USER',
+                DependencyKind::ReturnType,
+                'src/Domain/User.php',
+                10,
+            )],
+        );
+
+        self::assertSame([], $classInfo->dependencies);
+        self::assertSame([], $classInfo->dependencyEvidence);
     }
 }

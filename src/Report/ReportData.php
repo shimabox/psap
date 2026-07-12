@@ -64,7 +64,11 @@ final readonly class ReportData
      *     dependencies: list<array{
      *         from: string,
      *         to: string,
-     *         classDependencies: list<array{from: string, to: string}>,
+     *         classDependencies: list<array{
+     *             from: string,
+     *             to: string,
+     *             evidence: list<array{kind: string, file: string, line: int}>
+     *         }>,
      *     }>,
      * }>
      */
@@ -89,7 +93,11 @@ final readonly class ReportData
      *     dependencies: list<array{
      *         from: string,
      *         to: string,
-     *         classDependencies: list<array{from: string, to: string}>,
+     *         classDependencies: list<array{
+     *             from: string,
+     *             to: string,
+     *             evidence: list<array{kind: string, file: string, line: int}>
+     *         }>,
      *     }>,
      * }>
      */
@@ -137,7 +145,11 @@ final readonly class ReportData
      * @return list<array{
      *     from: string,
      *     to: string,
-     *     classDependencies: list<array{from: string, to: string}>,
+     *     classDependencies: list<array{
+     *         from: string,
+     *         to: string,
+     *         evidence: list<array{kind: string, file: string, line: int}>
+     *     }>,
      * }>
      */
     private function dependenciesInPath(array $path): array

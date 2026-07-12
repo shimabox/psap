@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Bobsap\Tests\Unit\Component;
 
 use Bobsap\Analyzer\ClassInfo;
+use Bobsap\Analyzer\DependencyEvidence;
+use Bobsap\Analyzer\DependencyKind;
 use Bobsap\Analyzer\TypeKind;
 use Bobsap\Component\Component;
 use Bobsap\Component\DependencyGraph;
@@ -46,11 +48,50 @@ final class DependencyGraphTest extends TestCase
                 'from' => 'App\\Domain',
                 'to' => 'App\\Infra',
                 'classDependencies' => [
-                    ['from' => 'App\\Domain\\Order', 'to' => 'App\\Infra\\UserRepository'],
-                    ['from' => 'App\\Domain\\User', 'to' => 'App\\Infra\\UserRepository'],
+                    ['from' => 'App\\Domain\\Order', 'to' => 'App\\Infra\\UserRepository', 'evidence' => []],
+                    ['from' => 'App\\Domain\\User', 'to' => 'App\\Infra\\UserRepository', 'evidence' => []],
                 ],
             ]],
             $graph->edgeDetails,
+        );
+    }
+
+    public function testIncludesSyntaxAndSourceLocationForClassDependency(): void
+    {
+        $domain = new Component('App\\Domain', [
+            new ClassInfo(
+                'App\\Domain\\User',
+                TypeKind::ConcreteClass,
+                '/project/src/Domain/User.php',
+                [],
+                [
+                    new DependencyEvidence(
+                        'App\\Infra\\UserRepository',
+                        DependencyKind::New,
+                        'Domain/User.php',
+                        24,
+                    ),
+                    new DependencyEvidence(
+                        'App\\Infra\\UserRepository',
+                        DependencyKind::ParameterType,
+                        'Domain/User.php',
+                        12,
+                    ),
+                ],
+            ),
+        ]);
+        $infra = new Component('App\\Infra', [
+            new ClassInfo('App\\Infra\\UserRepository', TypeKind::ConcreteClass, '/dummy.php', []),
+        ]);
+
+        $graph = DependencyGraph::fromComponents([$domain, $infra]);
+
+        self::assertSame(
+            [
+                ['kind' => 'parameter_type', 'file' => 'Domain/User.php', 'line' => 12],
+                ['kind' => 'new', 'file' => 'Domain/User.php', 'line' => 24],
+            ],
+            $graph->edgeDetails[0]['classDependencies'][0]['evidence'],
         );
     }
 

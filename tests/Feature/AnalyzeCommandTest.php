@@ -14,7 +14,8 @@ use Symfony\Component\Console\Tester\CommandTester;
 /**
  * AnalyzeCommandのFeatureテスト。
  *
- * @phpstan-type ClassDependency array{from: string, to: string}
+ * @phpstan-type Evidence array{kind: string, file: string, line: int}
+ * @phpstan-type ClassDependency array{from: string, to: string, evidence: list<Evidence>}
  * @phpstan-type Dependency array{from: string, to: string, classDependencies: list<ClassDependency>}
  * @phpstan-type CycleGroup array{
  *     components: list<string>,
@@ -364,6 +365,11 @@ final class AnalyzeCommandTest extends TestCase
         self::assertSame($path[0], array_last($path));
         self::assertNotEmpty($decoded['dependencies']);
         self::assertNotEmpty($decoded['dependencies'][0]['classDependencies']);
+        $evidence = $decoded['dependencies'][0]['classDependencies'][0]['evidence'];
+        self::assertNotEmpty($evidence);
+        self::assertContains($evidence[0]['kind'], ['parameter_type', 'return_type']);
+        self::assertStringNotContainsString(self::CYCLIC_PROJECT, $evidence[0]['file']);
+        self::assertGreaterThan(0, $evidence[0]['line']);
     }
 
     public function testWarnsWhenDepthCollapsesDeeperNamespacesIntoOneComponent(): void

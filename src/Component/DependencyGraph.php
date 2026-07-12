@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Bobsap\Component;
 
+use Bobsap\Analyzer\DependencyEvidence;
+
 /**
  * コンポーネント間依存グラフの値オブジェクト。
  *
@@ -15,7 +17,11 @@ final readonly class DependencyGraph
     /**
      * @param list<string> $nodes コンポーネント名一覧（ソート済み）
      * @param list<array{0: string, 1: string}> $edges [from, to] のペア一覧（ソート済み・重複なし）
-     * @param list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}> $edgeDetails
+     * @param list<array{from: string, to: string, classDependencies: list<array{
+     *     from: string,
+     *     to: string,
+     *     evidence: list<array{kind: string, file: string, line: int}>
+     * }>}> $edgeDetails
      */
     public function __construct(
         public array $nodes,
@@ -36,7 +42,11 @@ final readonly class DependencyGraph
 
         $seenPairs = [];
         $edges = [];
-        /** @var array<string, array<string, array{from: string, to: string}>> $classDependenciesByPair */
+        /** @var array<string, array<string, array{
+         *     from: string,
+         *     to: string,
+         *     evidence: list<array{kind: string, file: string, line: int}>
+         * }>> $classDependenciesByPair */
         $classDependenciesByPair = [];
         foreach ($components as $component) {
             $fromName = $component->name;
@@ -56,9 +66,36 @@ final readonly class DependencyGraph
                     }
 
                     $classPairKey = strtolower($classInfo->fqcn) . '|' . strtolower($target['fqcn']);
+                    $evidence = array_map(
+                        static fn (DependencyEvidence $item): array => [
+                            'kind' => $item->kind->value,
+                            'file' => $item->file,
+                            'line' => $item->line,
+                        ],
+                        array_values(array_filter(
+                            $classInfo->dependencyEvidence,
+                            static fn (DependencyEvidence $item): bool => strcasecmp(
+                                $item->targetFqcn,
+                                $target['fqcn'],
+                            ) === 0,
+                        )),
+                    );
+                    usort(
+                        $evidence,
+                        static fn (array $a, array $b): int => [
+                            $a['file'],
+                            $a['line'],
+                            $a['kind'],
+                        ] <=> [
+                            $b['file'],
+                            $b['line'],
+                            $b['kind'],
+                        ],
+                    );
                     $classDependenciesByPair[$pairKey][$classPairKey] = [
                         'from' => $classInfo->fqcn,
                         'to' => $target['fqcn'],
+                        'evidence' => $evidence,
                     ];
                 }
             }
