@@ -6,6 +6,7 @@ namespace Bobsap\Tests\Unit\Report;
 
 use Bobsap\Analyzer\ClassInfo;
 use Bobsap\Analyzer\TypeKind;
+use Bobsap\Baseline\CycleBaselineComparison;
 use Bobsap\Component\Component;
 use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
@@ -46,6 +47,7 @@ use PHPUnit\Framework\TestCase;
  *     cycles: list<list<string>>,
  *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
  *     cycleGroups: list<CycleGroup>,
+ *     cycleBaselineComparison: array{hasChanges: bool, newCycles: list<list<string>>, resolvedCycles: list<list<string>>}|null,
  *     warnings: list<string>,
  * }
  */
@@ -228,6 +230,28 @@ final class JsonReporterTest extends TestCase
         $decoded = $this->decode((new JsonReporter())->render($data));
 
         self::assertSame(['パースエラーのためスキップしました: /x.php'], $decoded['warnings']);
+    }
+
+    public function testEncodesCycleBaselineComparison(): void
+    {
+        $comparison = new CycleBaselineComparison(
+            newCycles: [['App\\A', 'App\\B']],
+            resolvedCycles: [['App\\C', 'App\\D']],
+        );
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            cycleBaselineComparison: $comparison,
+        );
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertSame([
+            'hasChanges' => true,
+            'newCycles' => [['App\\A', 'App\\B']],
+            'resolvedCycles' => [['App\\C', 'App\\D']],
+        ], $decoded['cycleBaselineComparison']);
     }
 
     public function testOutputIsUnescapedForSlashesAndUnicode(): void

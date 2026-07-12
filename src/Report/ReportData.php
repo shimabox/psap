@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bobsap\Report;
 
+use Bobsap\Baseline\CycleBaselineComparison;
 use Bobsap\Component\Component;
 use Bobsap\Component\CyclePathFinder;
 use Bobsap\Component\DependencyGraph;
@@ -35,6 +36,7 @@ final readonly class ReportData
         public array $cycles = [],
         ?DependencyGraph $dependencyGraph = null,
         public ?int $namespaceDepth = null,
+        public ?CycleBaselineComparison $cycleBaselineComparison = null,
     ) {
         $components = array_map(
             static fn (ComponentMetrics $metrics): Component => $metrics->component,

@@ -90,6 +90,19 @@ final class TextReporter implements ReporterInterface
             }
         }
 
+        if ($data->cycleBaselineComparison !== null) {
+            $lines[] = '';
+            $lines[] = 'Cycle baseline comparison:';
+            $lines[] = sprintf('  New cycles: %d', count($data->cycleBaselineComparison->newCycles));
+            foreach ($data->cycleBaselineComparison->newCycles as $cycle) {
+                $lines[] = '    + ' . implode(', ', $cycle);
+            }
+            $lines[] = sprintf('  Resolved cycles: %d', count($data->cycleBaselineComparison->resolvedCycles));
+            foreach ($data->cycleBaselineComparison->resolvedCycles as $cycle) {
+                $lines[] = '    - ' . implode(', ', $cycle);
+            }
+        }
+
         foreach ($data->componentMetrics as $metrics) {
             if (!$this->verbose && $metrics->zone === Zone::None) {
                 continue;

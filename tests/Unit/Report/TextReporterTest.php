@@ -6,6 +6,7 @@ namespace Bobsap\Tests\Unit\Report;
 
 use Bobsap\Analyzer\ClassInfo;
 use Bobsap\Analyzer\TypeKind;
+use Bobsap\Baseline\CycleBaselineComparison;
 use Bobsap\Component\Component;
 use Bobsap\Component\DependencyGraph;
 use Bobsap\Metrics\ComponentMetrics;
@@ -234,6 +235,27 @@ final class TextReporterTest extends TestCase
         $output = (new TextReporter())->render($data);
 
         self::assertStringContainsString('パースエラーのためスキップしました: /path/to/Broken.php', $output);
+    }
+
+    public function testRendersCycleBaselineComparison(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            cycleBaselineComparison: new CycleBaselineComparison(
+                newCycles: [['App\\A', 'App\\B']],
+                resolvedCycles: [['App\\C', 'App\\D']],
+            ),
+        );
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('Cycle baseline comparison:', $output);
+        self::assertStringContainsString('New cycles: 1', $output);
+        self::assertStringContainsString('+ App\\A, App\\B', $output);
+        self::assertStringContainsString('Resolved cycles: 1', $output);
+        self::assertStringContainsString('- App\\C, App\\D', $output);
     }
 
     public function testColumnsAlignAcrossRowsWithDifferentNameLengths(): void

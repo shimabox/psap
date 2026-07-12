@@ -6,6 +6,7 @@ namespace Bobsap\Console;
 
 use Bobsap\Analyzer\DependencyAnalyzer;
 use Bobsap\Analyzer\SourceFinder;
+use Bobsap\Baseline\CycleBaseline;
 use Bobsap\Component\ComponentClassifier;
 use Bobsap\Component\ComponentDepthResolver;
 use Bobsap\Component\CycleDetector;
@@ -19,6 +20,7 @@ use Bobsap\Report\PlantUmlReporter;
 use Bobsap\Report\ReportData;
 use Bobsap\Report\ReporterInterface;
 use Bobsap\Report\TextReporter;
+use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -89,6 +91,18 @@ final class AnalyzeCommand extends Command
                 '循環依存（ADP違反）が1つでもあれば exit code 1 にする',
             )
             ->addOption(
+                'generate-cycle-baseline',
+                null,
+                InputOption::VALUE_REQUIRED,
+                '現在の循環依存をベースラインファイルへ保存する',
+            )
+            ->addOption(
+                'cycle-baseline',
+                null,
+                InputOption::VALUE_REQUIRED,
+                '既存循環のベースラインファイルと比較する',
+            )
+            ->addOption(
                 'no-docblock',
                 null,
                 InputOption::VALUE_NONE,
@@ -153,6 +167,36 @@ final class AnalyzeCommand extends Command
         /** @var bool $failOnCycle */
         $failOnCycle = $input->getOption('fail-on-cycle');
 
+        /** @var string|null $generateCycleBaselinePath */
+        $generateCycleBaselinePath = $input->getOption('generate-cycle-baseline');
+        /** @var string|null $cycleBaselinePath */
+        $cycleBaselinePath = $input->getOption('cycle-baseline');
+        /** @var string|null $outputPath */
+        $outputPath = $input->getOption('output');
+        if ($generateCycleBaselinePath !== null && $cycleBaselinePath !== null) {
+            $errorOutput->writeln('<error>--generate-cycle-baseline と --cycle-baseline は同時に指定できません。</error>');
+
+            return Command::INVALID;
+        }
+        if ($generateCycleBaselinePath !== null && $failOnCycle) {
+            $errorOutput->writeln('<error>--generate-cycle-baseline と --fail-on-cycle は同時に指定できません。</error>');
+
+            return Command::INVALID;
+        }
+        if ($generateCycleBaselinePath !== null && $generateCycleBaselinePath === $outputPath) {
+            $errorOutput->writeln('<error>循環ベースラインと解析レポートの出力先は別のファイルにしてください。</error>');
+
+            return Command::INVALID;
+        }
+
+        $cycleBaseline = null;
+        if ($cycleBaselinePath !== null) {
+            $cycleBaseline = $this->loadCycleBaseline($cycleBaselinePath, $errorOutput);
+            if ($cycleBaseline === null) {
+                return Command::INVALID;
+            }
+        }
+
         /** @var bool $noDocblock */
         $noDocblock = $input->getOption('no-docblock');
 
@@ -171,6 +215,27 @@ final class AnalyzeCommand extends Command
         $dependencyGraph = DependencyGraph::fromComponents($components);
         $cycles = (new CycleDetector())->detect($dependencyGraph);
 
+        $cycleBaselineComparison = null;
+        if ($cycleBaseline !== null) {
+            try {
+                $cycleBaseline->assertCompatible($depth, !$noDocblock, $excludePatterns);
+            } catch (InvalidArgumentException $e) {
+                $errorOutput->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+
+                return Command::INVALID;
+            }
+            $cycleBaselineComparison = $cycleBaseline->compare($cycles);
+        }
+
+        if ($generateCycleBaselinePath !== null) {
+            $generatedBaseline = CycleBaseline::create($depth, !$noDocblock, $excludePatterns, $cycles);
+            if (@file_put_contents($generateCycleBaselinePath, $generatedBaseline->toJson() . PHP_EOL) === false) {
+                $errorOutput->writeln(sprintf('<error>循環ベースラインを書き込めませんでした: %s</error>', $generateCycleBaselinePath));
+
+                return Command::FAILURE;
+            }
+        }
+
         $warnings = $analysisResult->warnings;
         if ($components === []) {
             $warnings[] = '解析可能なクラス、インターフェース、トレイト、enumが見つかりませんでした。';
@@ -180,12 +245,18 @@ final class AnalyzeCommand extends Command
                 : 'コンポーネントが1件のみのため、コンポーネント間のCa、Ce、I、D、循環依存は評価できません。';
         }
 
-        $reportData = new ReportData($componentMetrics, $summary, $warnings, $cycles, $dependencyGraph, $depth);
+        $reportData = new ReportData(
+            $componentMetrics,
+            $summary,
+            $warnings,
+            $cycles,
+            $dependencyGraph,
+            $depth,
+            $cycleBaselineComparison,
+        );
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);
 
-        /** @var string|null $outputPath */
-        $outputPath = $input->getOption('output');
         if ($outputPath !== null) {
             if (@file_put_contents($outputPath, $rendered . PHP_EOL) === false) {
                 $errorOutput->writeln(sprintf('<error>出力ファイルに書き込めませんでした: %s</error>', $outputPath));
@@ -213,9 +284,15 @@ final class AnalyzeCommand extends Command
             }
         }
 
-        if ($failOnCycle && $cycles !== []) {
-            $errorOutput->writeln('<error>循環依存（ADP違反）が見つかりました:</error>');
+        $failingCycles = $cycleBaselineComparison === null ? $cycles : $cycleBaselineComparison->newCycles;
+        if ($failOnCycle && $failingCycles !== []) {
+            $errorOutput->writeln($cycleBaselineComparison === null
+                ? '<error>循環依存（ADP違反）が見つかりました:</error>'
+                : '<error>ベースラインにない循環依存（ADP違反）が見つかりました:</error>');
             foreach ($reportData->cycleGroups() as $group) {
+                if (!in_array($group['components'], $failingCycles, true)) {
+                    continue;
+                }
                 $errorOutput->writeln(sprintf(
                     '  - %d components, %s namespaces',
                     $group['componentCount'],
@@ -232,6 +309,24 @@ final class AnalyzeCommand extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    private function loadCycleBaseline(string $path, OutputInterface $errorOutput): ?CycleBaseline
+    {
+        $json = @file_get_contents($path);
+        if ($json === false) {
+            $errorOutput->writeln(sprintf('<error>循環ベースラインを読み込めませんでした: %s</error>', $path));
+
+            return null;
+        }
+
+        try {
+            return CycleBaseline::fromJson($json);
+        } catch (InvalidArgumentException $e) {
+            $errorOutput->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+
+            return null;
+        }
     }
 
     /**

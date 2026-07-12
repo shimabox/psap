@@ -42,6 +42,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  *     cycles: list<list<string>>,
  *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
  *     cycleGroups: list<CycleGroup>,
+ *     cycleBaselineComparison: array{hasChanges: bool, newCycles: list<list<string>>, resolvedCycles: list<list<string>>}|null,
  *     warnings: list<string>,
  * }
  */
@@ -214,6 +215,133 @@ final class AnalyzeCommandTest extends TestCase
         );
 
         self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    public function testGeneratedCycleBaselineAllowsExistingCycles(): void
+    {
+        $baselinePath = $this->temporaryBaselinePath();
+
+        try {
+            $generator = $this->commandTester();
+            $generateExitCode = $generator->execute([
+                'paths' => [self::CYCLIC_PROJECT],
+                '--depth' => '3',
+                '--generate-cycle-baseline' => $baselinePath,
+            ]);
+
+            self::assertSame(Command::SUCCESS, $generateExitCode);
+            self::assertFileExists($baselinePath);
+            /** @var array{schemaVersion: int, namespaceDepth: int, cycles: list<list<string>>} $baseline */
+            $baseline = json_decode((string) file_get_contents($baselinePath), true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame(1, $baseline['schemaVersion']);
+            self::assertSame(3, $baseline['namespaceDepth']);
+            self::assertCount(2, $baseline['cycles']);
+
+            $tester = $this->commandTester();
+            $exitCode = $tester->execute([
+                'paths' => [self::CYCLIC_PROJECT],
+                '--depth' => '3',
+                '--cycle-baseline' => $baselinePath,
+                '--fail-on-cycle' => true,
+            ]);
+
+            self::assertSame(Command::SUCCESS, $exitCode);
+            self::assertStringContainsString('New cycles: 0', $tester->getDisplay());
+        } finally {
+            @unlink($baselinePath);
+        }
+    }
+
+    public function testCycleBaselineFailsOnlyForNewCycles(): void
+    {
+        $baselinePath = $this->temporaryBaselinePath();
+
+        try {
+            $generator = $this->commandTester();
+            $generator->execute([
+                'paths' => [self::SIMPLE_PROJECT],
+                '--depth' => '3',
+                '--generate-cycle-baseline' => $baselinePath,
+            ]);
+
+            $tester = $this->commandTester();
+            $tester->execute(
+                [
+                    'paths' => [self::CYCLIC_PROJECT],
+                    '--depth' => '3',
+                    '--cycle-baseline' => $baselinePath,
+                    '--fail-on-cycle' => true,
+                ],
+                ['capture_stderr_separately' => true],
+            );
+
+            self::assertSame(Command::FAILURE, $tester->getStatusCode());
+            self::assertStringContainsString('Representative shortest path', $tester->getErrorOutput());
+        } finally {
+            @unlink($baselinePath);
+        }
+    }
+
+    public function testCycleBaselineReportsResolvedCyclesInJson(): void
+    {
+        $baselinePath = $this->temporaryBaselinePath();
+
+        try {
+            $generator = $this->commandTester();
+            $generator->execute([
+                'paths' => [self::CYCLIC_PROJECT],
+                '--depth' => '3',
+                '--generate-cycle-baseline' => $baselinePath,
+            ]);
+
+            $tester = $this->commandTester();
+            $tester->execute([
+                'paths' => [self::SIMPLE_PROJECT],
+                '--depth' => '3',
+                '--cycle-baseline' => $baselinePath,
+                '--format' => 'json',
+            ]);
+            $decoded = $this->decodeJson($tester->getDisplay());
+            $comparison = $decoded['cycleBaselineComparison'];
+            if ($comparison === null) {
+                self::fail('循環ベースラインの比較結果がありません。');
+            }
+
+            self::assertTrue($comparison['hasChanges']);
+            self::assertSame([], $comparison['newCycles']);
+            self::assertCount(2, $comparison['resolvedCycles']);
+        } finally {
+            @unlink($baselinePath);
+        }
+    }
+
+    public function testCycleBaselineRejectsDifferentDepth(): void
+    {
+        $baselinePath = $this->temporaryBaselinePath();
+
+        try {
+            $generator = $this->commandTester();
+            $generator->execute([
+                'paths' => [self::CYCLIC_PROJECT],
+                '--depth' => '3',
+                '--generate-cycle-baseline' => $baselinePath,
+            ]);
+
+            $tester = $this->commandTester();
+            $tester->execute(
+                [
+                    'paths' => [self::CYCLIC_PROJECT],
+                    '--depth' => '2',
+                    '--cycle-baseline' => $baselinePath,
+                ],
+                ['capture_stderr_separately' => true],
+            );
+
+            self::assertSame(Command::INVALID, $tester->getStatusCode());
+            self::assertStringContainsString('名前空間深度が一致しません', $tester->getErrorOutput());
+        } finally {
+            @unlink($baselinePath);
+        }
     }
 
     public function testJsonFormatIncludesCyclesForCyclicFixture(): void
@@ -407,6 +535,11 @@ final class AnalyzeCommandTest extends TestCase
         $command = $application->find('analyze');
 
         return new CommandTester($command);
+    }
+
+    private function temporaryBaselinePath(): string
+    {
+        return sys_get_temp_dir() . '/bobsap-cycle-baseline-' . uniqid() . '.json';
     }
 
     /** @return JsonReport */

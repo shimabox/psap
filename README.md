@@ -73,6 +73,8 @@ bobsap analyze <paths>... [options]
 | `--exclude` | fnmatch形式の除外パターン。複数指定可 | なし |
 | `--threshold` | Dが指定値を超えた場合に失敗 | なし |
 | `--fail-on-cycle` | 循環依存が見つかった場合に失敗 | 無効 |
+| `--generate-cycle-baseline` | 現在の循環をベースラインへ保存 | なし |
+| `--cycle-baseline` | ベースラインと循環を比較 | なし |
 | `--no-docblock` | docblockからの依存抽出を無効化 | 無効 |
 
 複数のディレクトリと除外パターンを指定できます。
@@ -88,6 +90,15 @@ bobsap analyze src/ --threshold 0.6 --fail-on-cycle
 ```
 
 終了コードは、成功が`0`、ゲート違反が`1`、入力エラーが`2`です。
+
+既存の循環を許容し、新しく発生した循環だけをCIで失敗させられます。
+
+```bash
+bobsap analyze src/ --generate-cycle-baseline bobsap-baseline.json
+bobsap analyze src/ --cycle-baseline bobsap-baseline.json --fail-on-cycle
+```
+
+ベースラインにはSCCのメンバー、名前空間深度、docblock設定、除外パターンを保存します。比較時に解析条件が一致しない場合は入力エラーになります。解消した循環はtextとJSONの比較結果へ出力します。
 
 ## 出力
 

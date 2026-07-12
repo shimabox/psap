@@ -34,6 +34,11 @@ final class JsonReporter implements ReporterInterface
             'cycles' => $data->cycles,
             'cyclePaths' => $data->cyclePathDetails(),
             'cycleGroups' => $data->cycleGroups(),
+            'cycleBaselineComparison' => $data->cycleBaselineComparison === null ? null : [
+                'hasChanges' => $data->cycleBaselineComparison->hasChanges(),
+                'newCycles' => $data->cycleBaselineComparison->newCycles,
+                'resolvedCycles' => $data->cycleBaselineComparison->resolvedCycles,
+            ],
             'warnings' => $data->warnings,
         ];
 
