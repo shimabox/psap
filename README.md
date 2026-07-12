@@ -1,193 +1,143 @@
 # bobsap
 
-PHPコードを解析し、Stable Abstractions Principle（SAP）のメトリクスを名前空間ごとに計測するCLIツールです。テキスト、JSON、Mermaid、PlantUMLで結果を出力でき、閾値や循環依存をCIのゲートにできます。
+`bobsap` は、PHP コードベースを解析して *Clean Architecture*（Robert C. Martin 著）第14章「安定度・抽象度等価の原則（SAP: Stable Abstractions Principle）」のメトリクス（Ca / Ce / I / A / D）を計測する CLI ツールです。
 
-## インストール
+設計が変更しづらくなっている場所、依存が集中している場所、循環依存の原因を見つけるために使います。解析はローカルで完結し、外部サービスへソースコードを送りません。
 
-### Docker
+## 分かること
 
-配布用イメージをビルドし、解析対象のプロジェクトを`/workdir`へマウントします。
+- 名前空間ごとの安定度と抽象度
+- 依存が集中しているコンポーネント
+- 循環依存を構成する具体的な経路
+- 依存が発生した構文、ファイル、行番号
+- 以前の解析から新しく増えた循環依存
 
-```bash
-docker build -t bobsap --target dist -f docker/Dockerfile .
-docker run --rm -v "$PWD":/workdir bobsap analyze src/
-```
+## おすすめの使い方
 
-PlantUMLからPNGまで生成する場合は、PlantUML、Java、Graphviz、CJKフォントを含むイメージを使います。
+最も有効なのは、既存プロジェクトのMarkdownレポートを作り、コードへアクセスできる生成AIと一緒に設計上の問題を確認する使い方です。
 
-```bash
-docker build -t bobsap:plantuml --target dist-plantuml -f docker/Dockerfile .
-docker run --rm -v "$PWD":/workdir bobsap:plantuml analyze-png src/ --depth 2
-```
+### 1 インストール
 
-実行するとカレントディレクトリに`bobsap-report.png`が作成されます。
-
-### PHAR
+Dockerイメージをビルドします。
 
 ```bash
-make phar
-php bobsap.phar analyze src/
+git clone https://github.com/shimabox/bobsap.git
+docker build -t bobsap --target dist -f bobsap/docker/Dockerfile bobsap
 ```
 
-### Composer
-
-Packagistにはまだ公開していません。GitHubリポジトリを直接指定してインストールできます。
+インストールできたことを確認します。
 
 ```bash
-composer config repositories.bobsap vcs https://github.com/shimabox/bobsap
-composer require --dev shimabox/bobsap:dev-main
-vendor/bin/bobsap analyze src/
+docker run --rm bobsap --version
 ```
 
-PHP 8.5以降が必要です。
+### 2 レポートを作る
 
-## メトリクス
+解析したいPHPプロジェクトへ移動し、ソースディレクトリを指定します。
 
-| 指標 | 計算 | 意味 |
-|---|---|---|
-| Ca | 外部から内部へ依存するクラス数 | 大きいほど安定 |
-| Ce | 内部から外部へ依存するクラス数 | 大きいほど不安定 |
-| I | `Ce / (Ca + Ce)` | 0が最安定、1が最不安定 |
-| A | `抽象型数 / 総型数` | 0が具象のみ、1が抽象のみ |
-| D | `\|A + I - 1\|` | 主系列からの距離 |
+```bash
+cd /path/to/your-project
+docker run --rm -v "$PWD":/workdir bobsap \
+  analyze src/ --format markdown --output bobsap-report.md
+```
 
-`interface`と`abstract class`を抽象型として数えます。`class`、`enum`、`trait`は具象型です。
+### 3 結果を確認する
 
-CaとCeがどちらも0のコンポーネントには、苦痛ゾーンや無駄ゾーンの判定を付けません。
+レポートが作成されたことを確認します。
 
-解析結果が1コンポーネントだけの場合、コンポーネント間のCa、Ce、I、Dは評価できません。テキストでは`N/A`、JSONでは`null`になります。Aはコンポーネント単体で計算できるため表示します。
+```bash
+sed -n '1,120p' bobsap-report.md
+```
 
-コンポーネントは名前空間単位です。`--depth 2`の場合、`App\Domain\Model\User`は`App\Domain`に属します。解析対象外のクラスへの依存はCaとCeに含めません。
+最初に`Review Priorities`を読み、次に`Circular Dependencies`と`Dependency Hotspots`を確認します。循環依存には、原因となるクラス、構文、ファイル、行番号が表示されます。
 
-## 使い方
+### 4 生成AIへ渡す
+
+Codexなど、解析対象のコードを読める生成AIに次のように依頼します。
 
 ```text
-bobsap analyze <paths>... [options]
+bobsap-report.mdを読んで、優先して直すべき問題を3件挙げてください。
+レポートに記載されたソースコードも確認し、意図的な依存か問題のある依存かを判断してください。
+それぞれについて、判断の根拠、影響、具体的な修正方針を示してください。
+まだコードは変更しないでください。
 ```
 
-| オプション | 説明 | 初期値 |
-|---|---|---|
-| `--depth` | 名前空間を束ねる深さ。`auto`または1以上の整数 | `auto` |
-| `--format` | `text`、`json`、`mermaid`、`plantuml` | `text` |
-| `--output` | 出力先ファイル | 標準出力 |
-| `--exclude` | fnmatch形式の除外パターン。複数指定可 | なし |
-| `--threshold` | Dが指定値を超えた場合に失敗 | なし |
-| `--fail-on-cycle` | 循環依存が見つかった場合に失敗 | 無効 |
-| `--generate-cycle-baseline` | 現在の循環をベースラインへ保存 | なし |
-| `--cycle-baseline` | ベースラインと循環を比較 | なし |
-| `--no-docblock` | docblockからの依存抽出を無効化 | 無効 |
+レポートだけを渡す場合は、生成AIがソースコードを確認できないことも伝えてください。その場合の提案は、調査の出発点として扱います。
 
-複数のディレクトリと除外パターンを指定できます。
+### 5 コードで確かめる
 
-```bash
-bobsap analyze src/ packages/ --depth 3 --exclude 'Generated/*' --exclude '*/Tests/*'
-```
+生成AIの提案と、レポートに記載されたファイル・行番号を照らし合わせます。循環依存が実際に不要か、名前空間の分け方が適切か、変更後の責務が明確になるかを確認してから修正します。
 
-Dの閾値と循環依存を同時に検査できます。
+修正後に同じコマンドを再実行し、循環や依存が減ったことを確認します。継続して監視したい場合は、同じ解析条件をCIへ追加します。
 
-```bash
-bobsap analyze src/ --threshold 0.6 --fail-on-cycle
-```
+<details>
+<summary>レポートで得られる内容</summary>
 
-終了コードは、成功が`0`、ゲート違反が`1`、入力エラーが`2`です。
-
-既存の循環を許容し、新しく発生した循環だけをCIで失敗させられます。
-
-```bash
-bobsap analyze src/ --generate-cycle-baseline bobsap-baseline.json
-bobsap analyze src/ --cycle-baseline bobsap-baseline.json --fail-on-cycle
-```
-
-ベースラインにはSCCのメンバー、名前空間深度、docblock設定、除外パターンを保存します。比較時に解析条件が一致しない場合は入力エラーになります。解消した循環はtextとJSONの比較結果へ出力します。
-
-## 出力
-
-テキスト形式ではCa、Ce、I、A、Dとゾーン判定を表で表示します。
+名前空間ごとのクラス数、Ca、Ce、I、A、D、問題領域を一覧できます。
 
 ```text
-bobsap - Stable Abstractions Principle metrics
-
 Component         Classes  Ca  Ce     I     A     D  Zone
 ----------------  -------  --  --  ----  ----  ----  ----------
 App\Domain              8   3   1  0.25  0.25  0.50
 App\Infrastructure      4   0   3  1.00  0.00  0.00
-
-Statistics: mean(D)=0.25, variance(D)=0.06
 ```
 
-`-v`を付けると、各コンポーネントに属するクラスも表示します。循環依存はSCC全体のメンバー数、親子名前空間を含むか、実際に一周する代表最短経路、経路に含まれないメンバー、クラス間依存の根拠を表示します。根拠には構文種別、解析対象からの相対ファイルパス、行番号が含まれます。JSONでは`dependencies`と`cycleGroups`から同じ情報を取得できます。
-
-MermaidはIとAの散布図を生成します。依存エッジや循環依存を図示する場合はPlantUMLを使ってください。
-
-`auto`は共通名前空間の次の階層を選びます。解析結果が1コンポーネントだけの場合は、コンポーネント間の指標を評価できないことを警告します。より深い名前空間があれば`--depth`の見直しも案内します。解析可能な型が見つからない場合も警告します。
-
-```bash
-bobsap analyze src/ --format json --output report.json
-bobsap analyze src/ --format mermaid --output report.mmd
-bobsap analyze src/ --format plantuml --output report.puml
-```
-
-## 解析範囲
-
-ASTから次の参照を抽出します。
-
-- 継承、インターフェイス、trait
-- プロパティ、引数、戻り値の型
-- union型、intersection型、nullable型
-- `new`、静的呼び出し、クラス定数
-- `instanceof`、`catch`
-- PHP Attribute
-- `@var`、`@param`、`@return`、`@throws`
-
-docblockでは配列、generic、union、intersection、nullable型を分解し、`use`と名前空間を使ってクラス名を解決します。壊れたdocblockは無視されます。
-
-次の参照は対象外です。
-
-- `class_exists('X')`などの文字列参照
-- `new $className`などの動的参照
-- 無名クラスの宣言と内部依存
-- 解析対象パス外のクラス
-
-設定ファイル、ディレクトリベースのコンポーネント分類、HTMLレポートには対応していません。
-
-## CI
-
-```yaml
-name: bobsap
-on: [pull_request]
-jobs:
-  metrics:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t bobsap --target dist -f docker/Dockerfile .
-      - run: docker run --rm -v "$PWD":/workdir bobsap analyze src/ --threshold 0.6 --fail-on-cycle
-```
-
-このリポジトリのCIはPHP 8.5でテスト、PHPStan、PHP CS Fixerを実行します。続いてbobsap自身を解析し、各形式のレポートをArtifactとStep Summaryへ出力します。
-
-## 開発
-
-ホスト側にPHPやComposerは不要です。
-
-```bash
-make setup
-make test
-make stan
-make cs
-make cs-fix
-make phar
-make build-dist
-make build-plantuml
-```
-
-コードは処理の段階ごとに分かれています。
+循環依存がある場合は、原因となるクラスとコード位置まで表示します。
 
 ```text
-SourceFinder -> DependencyAnalyzer -> ComponentClassifier -> MetricsCalculator -> Reporter
-                                          |
-                                          +-> DependencyGraph -> CycleDetector
+App\Domain\Order -> App\Infrastructure\OrderRepository
+  parameter_type at Domain/Order.php:18
 ```
+
+Markdownレポートには、優先して確認する箇所、循環依存、依存の多い箇所、全コンポーネントの指標がまとまります。
+
+</details>
+
+<details>
+<summary>コンポーネントが1件だけになる場合</summary>
+
+警告に従って`--depth`を増やします。
+
+```bash
+docker run --rm -v "$PWD":/workdir bobsap \
+  analyze src/ --depth 3 --format markdown --output bobsap-report.md
+```
+
+深さを増やしても1件の場合は、名前空間が分割されていないか、解析対象の指定が狭すぎる可能性があります。
+
+</details>
+
+<details>
+<summary>複数のソースディレクトリを解析する場合</summary>
+
+解析対象のパスを続けて指定します。
+
+```bash
+docker run --rm -v "$PWD":/workdir bobsap \
+  analyze src/ packages/ --format markdown --output bobsap-report.md
+```
+
+</details>
+
+## CIで使う
+
+Dが閾値を超えた場合や、循環依存が見つかった場合に終了コード`1`を返せます。
+
+```bash
+docker run --rm -v "$PWD":/workdir bobsap \
+  analyze src/ --threshold 0.6 --fail-on-cycle
+```
+
+既存の循環をベースラインとして保存し、新しく増えた循環だけを検出することもできます。
+
+## ドキュメント
+
+- [導入と基本操作](docs/getting-started.md)
+- [解析内容と出力形式](docs/analysis.md)
+- [CIでの利用](docs/ci.md)
+- [開発](docs/development.md)
+
+PHP 8.5以降が必要です。Dockerを使う場合、ホスト側のPHPは不要です。
 
 ## ライセンス
 
