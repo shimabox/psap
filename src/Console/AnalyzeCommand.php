@@ -15,6 +15,7 @@ use Bobsap\Metrics\ComponentMetrics;
 use Bobsap\Metrics\MetricsCalculator;
 use Bobsap\Metrics\MetricsSummary;
 use Bobsap\Report\JsonReporter;
+use Bobsap\Report\MarkdownReporter;
 use Bobsap\Report\MermaidReporter;
 use Bobsap\Report\PlantUmlReporter;
 use Bobsap\Report\ReportData;
@@ -253,6 +254,9 @@ final class AnalyzeCommand extends Command
             $dependencyGraph,
             $depth,
             $cycleBaselineComparison,
+            $paths,
+            !$noDocblock,
+            $excludePatterns,
         );
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);
@@ -375,6 +379,7 @@ final class AnalyzeCommand extends Command
         return [
             'text' => static fn (bool $verbose): ReporterInterface => new TextReporter($verbose),
             'json' => static fn (bool $verbose): ReporterInterface => new JsonReporter(),
+            'markdown' => static fn (bool $verbose): ReporterInterface => new MarkdownReporter(),
             'mermaid' => static fn (bool $verbose): ReporterInterface => new MermaidReporter(),
             'plantuml' => static fn (bool $verbose): ReporterInterface => new PlantUmlReporter(),
         ];

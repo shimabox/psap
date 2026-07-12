@@ -28,6 +28,8 @@ final readonly class ReportData
      * @param list<ComponentMetrics> $componentMetrics
      * @param list<string> $warnings Analyzer が発したパース警告等
      * @param list<list<string>> $cycles 循環依存（ADP違反）。各要素は循環しているコンポーネント名のリスト
+     * @param list<string> $sourcePaths 解析対象として指定されたパス
+     * @param list<string> $excludePatterns 解析から除外したパターン
      */
     public function __construct(
         public array $componentMetrics,
@@ -37,6 +39,9 @@ final readonly class ReportData
         ?DependencyGraph $dependencyGraph = null,
         public ?int $namespaceDepth = null,
         public ?CycleBaselineComparison $cycleBaselineComparison = null,
+        public array $sourcePaths = [],
+        public bool $docblockEnabled = true,
+        public array $excludePatterns = [],
     ) {
         $components = array_map(
             static fn (ComponentMetrics $metrics): Component => $metrics->component,

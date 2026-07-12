@@ -81,6 +81,21 @@ final class AnalyzeCommandTest extends TestCase
         self::assertGreaterThan(0, $decoded['summary']['componentCount']);
     }
 
+    public function testMarkdownFormatRendersPromptReadyReport(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(['paths' => [self::CYCLIC_PROJECT], '--depth' => '3', '--format' => 'markdown']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('# bobsap Architecture Analysis', $display);
+        self::assertStringContainsString('## Review Priorities', $display);
+        self::assertStringContainsString('## Circular Dependencies', $display);
+        self::assertStringContainsString('`parameter_type` at `A/Foo.php:', $display);
+        self::assertStringContainsString('- Source paths `' . self::CYCLIC_PROJECT . '`', $display);
+    }
+
     public function testMermaidFormatRendersQuadrantChart(): void
     {
         $tester = $this->commandTester();
