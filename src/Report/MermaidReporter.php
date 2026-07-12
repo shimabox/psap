@@ -39,8 +39,15 @@ final class MermaidReporter implements ReporterInterface
         $lines[] = '    quadrant-3 Pain Zone';
         $lines[] = '    quadrant-4 Main Sequence';
 
-        foreach ($data->componentMetrics as $metrics) {
+        $evaluableMetrics = array_values(array_filter(
+            $data->componentMetrics,
+            static fn (ComponentMetrics $metrics): bool => $metrics->dependencyMetricsEvaluable,
+        ));
+        foreach ($evaluableMetrics as $metrics) {
             $lines[] = $this->pointLine($metrics);
+        }
+        if ($evaluableMetrics === []) {
+            $lines[] = '    %% No components with evaluable dependency metrics';
         }
 
         return implode("\n", $lines);

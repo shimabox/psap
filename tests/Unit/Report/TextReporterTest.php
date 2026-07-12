@@ -166,7 +166,8 @@ final class TextReporterTest extends TestCase
         $output = (new TextReporter())->render($data);
 
         self::assertStringContainsString('Cycles (ADP violation):', $output);
-        self::assertStringContainsString('Path: App\\Domain -> App\\Infra -> App\\Domain', $output);
+        self::assertStringContainsString('Representative shortest path: App\\Domain -> App\\Infra -> App\\Domain', $output);
+        self::assertStringContainsString('2 components, peer namespaces', $output);
         self::assertStringContainsString('App\\Domain\\Order -> App\\Infra\\Repository', $output);
         self::assertStringContainsString('App\\Infra\\Repository -> App\\Domain\\Order', $output);
         // 統計行の後にセクションが出ること
@@ -192,7 +193,8 @@ final class TextReporterTest extends TestCase
 
         $output = (new TextReporter())->render($data);
 
-        self::assertStringContainsString('Path: App\\A -> App\\B -> App\\A', $output);
+        self::assertStringContainsString('Representative shortest path: App\\A -> App\\B -> App\\A', $output);
+        self::assertStringContainsString('Omitted from path (1): App\\C', $output);
         self::assertStringNotContainsString('App\\A -> App\\C', $output);
         self::assertStringNotContainsString('App\\C -> App\\A', $output);
     }
@@ -207,6 +209,19 @@ final class TextReporterTest extends TestCase
         $output = (new TextReporter())->render($data);
 
         self::assertStringNotContainsString('Cycles', $output);
+    }
+
+    public function testRendersUnavailableDependencyMetricsAsNotApplicable(): void
+    {
+        $metrics = [
+            $this->metrics('App', 0, 0, 0.0, 0.25, 0.75, Zone::None, dependencyMetricsEvaluable: false),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertMatchesRegularExpression('/App\s+0\s+N\/A\s+N\/A\s+N\/A\s+0\.25\s+N\/A/', $output);
+        self::assertStringContainsString('Statistics: mean(D)=N/A, variance(D)=N/A', $output);
     }
 
     public function testAppendsWarningsAtEnd(): void
@@ -284,6 +299,7 @@ final class TextReporterTest extends TestCase
         float $distance,
         Zone $zone,
         array $classInfos = [],
+        bool $dependencyMetricsEvaluable = true,
     ): ComponentMetrics {
         return new ComponentMetrics(
             component: new Component($name, $classInfos),
@@ -293,6 +309,7 @@ final class TextReporterTest extends TestCase
             abstractness: $abstractness,
             distance: $distance,
             zone: $zone,
+            dependencyMetricsEvaluable: $dependencyMetricsEvaluable,
         );
     }
 }

@@ -124,6 +124,18 @@ final class MetricsCalculatorTest extends TestCase
         self::assertSame(0, $metrics[0]->ce);
         self::assertEqualsWithDelta(0.0, $metrics[0]->instability, 0.0001);
         self::assertSame(Zone::None, $metrics[0]->zone);
+        self::assertFalse($metrics[0]->dependencyMetricsEvaluable);
+    }
+
+    public function testDependencyMetricsRemainEvaluableForIsolatedComponentsInMultiComponentAnalysis(): void
+    {
+        $isolated = new Component('App\\Isolated', [$this->classInfo('App\\Isolated\\Lonely')]);
+        $other = new Component('App\\Other', [$this->classInfo('App\\Other\\Other')]);
+
+        $metrics = (new MetricsCalculator())->calculate([$isolated, $other]);
+
+        self::assertTrue($metrics[0]->dependencyMetricsEvaluable);
+        self::assertTrue($metrics[1]->dependencyMetricsEvaluable);
     }
 
     public function testAbstractnessIsZeroWhenComponentHasNoClasses(): void

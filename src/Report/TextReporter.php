@@ -47,17 +47,33 @@ final class TextReporter implements ReporterInterface
         }
 
         $lines[] = '';
-        $lines[] = sprintf(
-            'Statistics: mean(D)=%.2f, variance(D)=%.2f',
-            $data->summary->meanDistance,
-            $data->summary->varianceDistance,
-        );
+        $lines[] = $data->summary->meanDistance === null || $data->summary->varianceDistance === null
+            ? 'Statistics: mean(D)=N/A, variance(D)=N/A'
+            : sprintf(
+                'Statistics: mean(D)=%.2f, variance(D)=%.2f',
+                $data->summary->meanDistance,
+                $data->summary->varianceDistance,
+            );
 
         if ($data->cycles !== []) {
             $lines[] = '';
             $lines[] = 'Cycles (ADP violation):';
-            foreach ($data->cyclePathDetails() as $cycle) {
-                $lines[] = '  - Path: ' . implode(' -> ', $cycle['path']);
+            foreach ($data->cycleGroups() as $index => $cycle) {
+                $lines[] = sprintf(
+                    '  - Cycle %d (%d components, %s namespaces)',
+                    $index + 1,
+                    $cycle['componentCount'],
+                    $cycle['namespaceRelation'],
+                );
+                $lines[] = '    Components: ' . implode(', ', $cycle['components']);
+                $lines[] = '    Representative shortest path: ' . implode(' -> ', $cycle['representativePath']);
+                if ($cycle['omittedComponents'] !== []) {
+                    $lines[] = sprintf(
+                        '    Omitted from path (%d): %s',
+                        count($cycle['omittedComponents']),
+                        implode(', ', $cycle['omittedComponents']),
+                    );
+                }
                 $lines[] = '    Dependency evidence:';
                 foreach ($cycle['dependencies'] as $dependency) {
                     $lines[] = sprintf('      %s -> %s', $dependency['from'], $dependency['to']);
@@ -116,8 +132,8 @@ final class TextReporter implements ReporterInterface
         foreach ($componentMetrics as $metrics) {
             $nameWidth = max($nameWidth, mb_strlen($metrics->component->name));
             $classesWidth = max($classesWidth, mb_strlen((string) count($metrics->component->classInfos)));
-            $caWidth = max($caWidth, mb_strlen((string) $metrics->ca));
-            $ceWidth = max($ceWidth, mb_strlen((string) $metrics->ce));
+            $caWidth = max($caWidth, mb_strlen($metrics->dependencyMetricsEvaluable ? (string) $metrics->ca : 'N/A'));
+            $ceWidth = max($ceWidth, mb_strlen($metrics->dependencyMetricsEvaluable ? (string) $metrics->ce : 'N/A'));
         }
 
         return [
@@ -168,15 +184,20 @@ final class TextReporter implements ReporterInterface
      */
     private function rowLine(ComponentMetrics $metrics, array $widths): string
     {
+        $ca = $metrics->dependencyMetricsEvaluable ? (string) $metrics->ca : 'N/A';
+        $ce = $metrics->dependencyMetricsEvaluable ? (string) $metrics->ce : 'N/A';
+        $instability = $metrics->dependencyMetricsEvaluable ? sprintf('%.2f', $metrics->instability) : 'N/A';
+        $distance = $metrics->dependencyMetricsEvaluable ? sprintf('%.2f', $metrics->distance) : 'N/A';
+
         $row = sprintf(
-            '%-' . $widths['name'] . 's  %' . $widths['classes'] . 'd  %' . $widths['ca'] . 'd  %' . $widths['ce'] . 'd  %' . $widths['decimal'] . '.2f  %' . $widths['decimal'] . '.2f  %' . $widths['decimal'] . '.2f',
+            '%-' . $widths['name'] . 's  %' . $widths['classes'] . 'd  %' . $widths['ca'] . 's  %' . $widths['ce'] . 's  %' . $widths['decimal'] . 's  %' . $widths['decimal'] . '.2f  %' . $widths['decimal'] . 's',
             $metrics->component->name,
             count($metrics->component->classInfos),
-            $metrics->ca,
-            $metrics->ce,
-            $metrics->instability,
+            $ca,
+            $ce,
+            $instability,
             $metrics->abstractness,
-            $metrics->distance,
+            $distance,
         );
 
         if ($metrics->zone !== Zone::None) {

@@ -11,14 +11,47 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 
-// AnalyzeCommand の Feature テスト。
-// tests/Fixtures/SimpleProject に対して実行し、出力内容と exit code を確認する。
+/**
+ * AnalyzeCommandのFeatureテスト。
+ *
+ * @phpstan-type ClassDependency array{from: string, to: string}
+ * @phpstan-type Dependency array{from: string, to: string, classDependencies: list<ClassDependency>}
+ * @phpstan-type CycleGroup array{
+ *     components: list<string>,
+ *     componentCount: int,
+ *     namespaceRelation: 'hierarchical'|'peer',
+ *     representativePath: list<string>,
+ *     omittedComponents: list<string>,
+ *     dependencies: list<Dependency>,
+ * }
+ * @phpstan-type JsonReport array{
+ *     summary: array{componentCount: int, namespaceDepth: int|null, metricsEvaluable: bool, meanDistance: float|null, varianceDistance: float|null},
+ *     components: list<array{
+ *         name: string,
+ *         classCount: int,
+ *         metricsEvaluable: bool,
+ *         ca: int|null,
+ *         ce: int|null,
+ *         instability: float|null,
+ *         abstractness: float,
+ *         distance: float|null,
+ *         zone: string|null,
+ *         classes: list<array{fqcn: string, kind: string}>,
+ *     }>,
+ *     dependencies: list<Dependency>,
+ *     cycles: list<list<string>>,
+ *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
+ *     cycleGroups: list<CycleGroup>,
+ *     warnings: list<string>,
+ * }
+ */
 final class AnalyzeCommandTest extends TestCase
 {
     private const SIMPLE_PROJECT = __DIR__ . '/../Fixtures/SimpleProject';
     private const CYCLIC_PROJECT = __DIR__ . '/../Fixtures/CyclicProject';
     private const DOCBLOCK_ONLY_PROJECT = __DIR__ . '/../Fixtures/DocblockOnlyProject';
     private const BROKEN_PROJECT = __DIR__ . '/../Fixtures/BrokenProject';
+    private const FUNCTION_ONLY_PROJECT = __DIR__ . '/../Fixtures/FunctionOnlyProject';
 
     public function testTextFormatRendersTableAndExitsSuccessfully(): void
     {
@@ -165,8 +198,9 @@ final class AnalyzeCommandTest extends TestCase
 
         self::assertSame(Command::FAILURE, $tester->getStatusCode());
         self::assertStringContainsString('循環依存', $tester->getErrorOutput());
+        self::assertStringContainsString('Components: Fixture\\Cyclic\\A, Fixture\\Cyclic\\B', $tester->getErrorOutput());
         self::assertStringContainsString(
-            'Path: Fixture\\Cyclic\\A -> Fixture\\Cyclic\\B -> Fixture\\Cyclic\\A',
+            'Representative shortest path: Fixture\\Cyclic\\A -> Fixture\\Cyclic\\B -> Fixture\\Cyclic\\A',
             $tester->getErrorOutput(),
         );
     }
@@ -192,6 +226,9 @@ final class AnalyzeCommandTest extends TestCase
 
         self::assertNotEmpty($decoded['cycles']);
         self::assertNotEmpty($decoded['cyclePaths']);
+        self::assertNotEmpty($decoded['cycleGroups']);
+        self::assertGreaterThanOrEqual(2, $decoded['cycleGroups'][0]['componentCount']);
+        self::assertSame('peer', $decoded['cycleGroups'][0]['namespaceRelation']);
         $path = $decoded['cyclePaths'][0]['path'];
         if ($path === []) {
             self::fail('循環経路が空です。');
@@ -221,9 +258,36 @@ final class AnalyzeCommandTest extends TestCase
 
         self::assertCount(1, $decoded['components']);
         self::assertStringContainsString(
-            'コンポーネント間のCa、Ce、循環依存は評価できません',
+            'コンポーネント間のCa、Ce、I、D、循環依存は評価できません',
             implode("\n", $decoded['warnings']),
         );
+        self::assertFalse($decoded['summary']['metricsEvaluable']);
+        self::assertNull($decoded['summary']['meanDistance']);
+        self::assertNull($decoded['components'][0]['ca']);
+        self::assertNull($decoded['components'][0]['distance']);
+    }
+
+    public function testWarnsWhenNoClassLikeDeclarationsAreFound(): void
+    {
+        $tester = $this->commandTester();
+        $tester->execute(['paths' => [self::FUNCTION_ONLY_PROJECT], '--format' => 'json']);
+
+        $decoded = $this->decodeJson($tester->getDisplay());
+
+        self::assertSame(0, $decoded['summary']['componentCount']);
+        self::assertFalse($decoded['summary']['metricsEvaluable']);
+        self::assertNull($decoded['summary']['meanDistance']);
+        self::assertStringContainsString('解析可能なクラス', implode("\n", $decoded['warnings']));
+    }
+
+    public function testThresholdIgnoresUnavailableSingleComponentMetrics(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(['paths' => [self::BROKEN_PROJECT], '--threshold' => '0']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString('N/A', $tester->getDisplay());
     }
 
     public function testOutputOptionWritesToFileInsteadOfStdout(): void
@@ -322,8 +386,8 @@ final class AnalyzeCommandTest extends TestCase
     }
 
     /**
-     * @param array{components: list<array{name: string, ce: int, ca: int}>} $decoded
-     * @return array{name: string, ce: int, ca: int}
+     * @param JsonReport $decoded
+     * @return array{name: string, ce: int|null, ca: int|null}
      */
     private function findComponent(array $decoded, string $name): array
     {
@@ -345,48 +409,10 @@ final class AnalyzeCommandTest extends TestCase
         return new CommandTester($command);
     }
 
-    /**
-     * @return array{
-     *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
-     *     components: list<array{
-     *         name: string,
-     *         classCount: int,
-     *         ca: int,
-     *         ce: int,
-     *         instability: float,
-     *         abstractness: float,
-     *         distance: float,
-     *         zone: string|null,
-     *         classes: list<array{fqcn: string, kind: string}>,
-     *     }>,
-     *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
-     *     cycles: list<list<string>>,
-     *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
-     *     warnings: list<string>,
-     * }
-     */
+    /** @return JsonReport */
     private function decodeJson(string $json): array
     {
-        /**
-         * @var array{
-         *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
-         *     components: list<array{
-         *         name: string,
-         *         classCount: int,
-         *         ca: int,
-         *         ce: int,
-         *         instability: float,
-         *         abstractness: float,
-         *         distance: float,
-         *         zone: string|null,
-         *         classes: list<array{fqcn: string, kind: string}>,
-         *     }>,
-         *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
-         *     cycles: list<list<string>>,
-         *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
-         *     warnings: list<string>,
-         * } $decoded
-         */
+        /** @var JsonReport $decoded */
         $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
 
         return $decoded;

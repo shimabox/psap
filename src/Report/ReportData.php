@@ -69,12 +69,65 @@ final readonly class ReportData
     public function cyclePathDetails(): array
     {
         return array_map(
-            fn (array $path): array => [
-                'path' => $path,
-                'dependencies' => $this->dependenciesInPath($path),
+            static fn (array $group): array => [
+                'path' => $group['representativePath'],
+                'dependencies' => $group['dependencies'],
             ],
-            $this->cyclePaths,
+            $this->cycleGroups(),
         );
+    }
+
+    /**
+     * @return list<array{
+     *     components: list<string>,
+     *     componentCount: int,
+     *     namespaceRelation: 'hierarchical'|'peer',
+     *     representativePath: list<string>,
+     *     omittedComponents: list<string>,
+     *     dependencies: list<array{
+     *         from: string,
+     *         to: string,
+     *         classDependencies: list<array{from: string, to: string}>,
+     *     }>,
+     * }>
+     */
+    public function cycleGroups(): array
+    {
+        $groups = [];
+        foreach ($this->cycles as $index => $components) {
+            $path = $this->cyclePaths[$index] ?? [];
+            $pathComponents = array_values(array_unique($path));
+            $groups[] = [
+                'components' => $components,
+                'componentCount' => count($components),
+                'namespaceRelation' => $this->namespaceRelation($components),
+                'representativePath' => $path,
+                'omittedComponents' => array_values(array_diff($components, $pathComponents)),
+                'dependencies' => $this->dependenciesInPath($path),
+            ];
+        }
+
+        return $groups;
+    }
+
+    /**
+     * @param list<string> $cycle
+     * @return 'hierarchical'|'peer'
+     */
+    private function namespaceRelation(array $cycle): string
+    {
+        foreach ($this->edgesInCycle($cycle) as [$from, $to]) {
+            if ($this->isNamespaceParent($from, $to) || $this->isNamespaceParent($to, $from)) {
+                return 'hierarchical';
+            }
+        }
+
+        return 'peer';
+    }
+
+    private function isNamespaceParent(string $parent, string $child): bool
+    {
+        return str_starts_with($child, $parent . '\\');
     }
 
     /**

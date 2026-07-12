@@ -15,7 +15,40 @@ use Bobsap\Report\JsonReporter;
 use Bobsap\Report\ReportData;
 use PHPUnit\Framework\TestCase;
 
-// JsonReporter: JSON スキーマ（summary/components/warnings）を固定するテスト
+/**
+ * JsonReporter のJSONスキーマを固定するテスト。
+ *
+ * @phpstan-type ClassDependency array{from: string, to: string}
+ * @phpstan-type Dependency array{from: string, to: string, classDependencies: list<ClassDependency>}
+ * @phpstan-type CycleGroup array{
+ *     components: list<string>,
+ *     componentCount: int,
+ *     namespaceRelation: 'hierarchical'|'peer',
+ *     representativePath: list<string>,
+ *     omittedComponents: list<string>,
+ *     dependencies: list<Dependency>,
+ * }
+ * @phpstan-type JsonReport array{
+ *     summary: array{componentCount: int, namespaceDepth: int|null, metricsEvaluable: bool, meanDistance: float|null, varianceDistance: float|null},
+ *     components: list<array{
+ *         name: string,
+ *         classCount: int,
+ *         metricsEvaluable: bool,
+ *         ca: int|null,
+ *         ce: int|null,
+ *         instability: float|null,
+ *         abstractness: float,
+ *         distance: float|null,
+ *         zone: string|null,
+ *         classes: list<array{fqcn: string, kind: string}>,
+ *     }>,
+ *     dependencies: list<Dependency>,
+ *     cycles: list<list<string>>,
+ *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
+ *     cycleGroups: list<CycleGroup>,
+ *     warnings: list<string>,
+ * }
+ */
 final class JsonReporterTest extends TestCase
 {
     public function testEncodesSummary(): void
@@ -29,6 +62,7 @@ final class JsonReporterTest extends TestCase
         $decoded = $this->decode((new JsonReporter())->render($data));
 
         self::assertSame(2, $decoded['summary']['componentCount']);
+        self::assertTrue($decoded['summary']['metricsEvaluable']);
         self::assertEqualsWithDelta(0.025, $decoded['summary']['meanDistance'], 0.0001);
         self::assertArrayHasKey('varianceDistance', $decoded['summary']);
     }
@@ -51,6 +85,27 @@ final class JsonReporterTest extends TestCase
         self::assertEqualsWithDelta(0.75, $component['abstractness'], 0.0001);
         self::assertEqualsWithDelta(0.05, $component['distance'], 0.0001);
         self::assertNull($component['zone']);
+        self::assertTrue($component['metricsEvaluable']);
+    }
+
+    public function testEncodesUnavailableDependencyMetricsAsNull(): void
+    {
+        $metrics = [
+            $this->metrics('App', 0, 0, 0.0, 0.25, 0.75, Zone::None, dependencyMetricsEvaluable: false),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertFalse($decoded['summary']['metricsEvaluable']);
+        self::assertNull($decoded['summary']['meanDistance']);
+        self::assertNull($decoded['summary']['varianceDistance']);
+        self::assertFalse($decoded['components'][0]['metricsEvaluable']);
+        self::assertNull($decoded['components'][0]['ca']);
+        self::assertNull($decoded['components'][0]['ce']);
+        self::assertNull($decoded['components'][0]['instability']);
+        self::assertSame(0.25, $decoded['components'][0]['abstractness']);
+        self::assertNull($decoded['components'][0]['distance']);
     }
 
     public function testEncodesZoneAsPainOrUseless(): void
@@ -107,6 +162,31 @@ final class JsonReporterTest extends TestCase
         self::assertSame([['App\\Domain', 'App\\Infra']], $decoded['cycles']);
         self::assertSame(['App\\Domain', 'App\\Infra', 'App\\Domain'], $decoded['cyclePaths'][0]['path']);
         self::assertSame($graph->edgeDetails, $decoded['cyclePaths'][0]['dependencies']);
+        self::assertSame(['App\\Domain', 'App\\Infra'], $decoded['cycleGroups'][0]['components']);
+        self::assertSame(2, $decoded['cycleGroups'][0]['componentCount']);
+        self::assertSame('peer', $decoded['cycleGroups'][0]['namespaceRelation']);
+        self::assertSame([], $decoded['cycleGroups'][0]['omittedComponents']);
+    }
+
+    public function testEncodesHierarchicalCycleAndComponentsOmittedFromRepresentativePath(): void
+    {
+        $graph = new DependencyGraph(
+            ['App', 'App\\Child', 'App\\Other'],
+            [
+                ['App', 'App\\Child'],
+                ['App\\Child', 'App'],
+                ['App\\Child', 'App\\Other'],
+                ['App\\Other', 'App'],
+            ],
+        );
+        $data = new ReportData([], MetricsSummary::from([]), [], [['App', 'App\\Child', 'App\\Other']], $graph);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+        $group = $decoded['cycleGroups'][0];
+
+        self::assertSame('hierarchical', $group['namespaceRelation']);
+        self::assertSame(['App', 'App\\Child', 'App'], $group['representativePath']);
+        self::assertSame(['App\\Other'], $group['omittedComponents']);
     }
 
     public function testEncodesDependencyEdgesWithClassEvidence(): void
@@ -138,6 +218,7 @@ final class JsonReporterTest extends TestCase
 
         self::assertSame([], $decoded['cycles']);
         self::assertSame([], $decoded['cyclePaths']);
+        self::assertSame([], $decoded['cycleGroups']);
     }
 
     public function testEncodesWarnings(): void
@@ -165,48 +246,10 @@ final class JsonReporterTest extends TestCase
         self::assertStringContainsString("\n", $output);
     }
 
-    /**
-     * @return array{
-     *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
-     *     components: list<array{
-     *         name: string,
-     *         classCount: int,
-     *         ca: int,
-     *         ce: int,
-     *         instability: float,
-     *         abstractness: float,
-     *         distance: float,
-     *         zone: string|null,
-     *         classes: list<array{fqcn: string, kind: string}>,
-     *     }>,
-     *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
-     *     cycles: list<list<string>>,
-     *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
-     *     warnings: list<string>,
-     * }
-     */
+    /** @return JsonReport */
     private function decode(string $json): array
     {
-        /**
-         * @var array{
-         *     summary: array{componentCount: int, namespaceDepth: int|null, meanDistance: float, varianceDistance: float},
-         *     components: list<array{
-         *         name: string,
-         *         classCount: int,
-         *         ca: int,
-         *         ce: int,
-         *         instability: float,
-         *         abstractness: float,
-         *         distance: float,
-         *         zone: string|null,
-         *         classes: list<array{fqcn: string, kind: string}>,
-         *     }>,
-         *     dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>,
-         *     cycles: list<list<string>>,
-         *     cyclePaths: list<array{path: list<string>, dependencies: list<array{from: string, to: string, classDependencies: list<array{from: string, to: string}>}>}>,
-         *     warnings: list<string>,
-         * } $decoded
-         */
+        /** @var JsonReport $decoded */
         $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
 
         return $decoded;
@@ -224,6 +267,7 @@ final class JsonReporterTest extends TestCase
         float $distance,
         Zone $zone,
         array $classInfos = [],
+        bool $dependencyMetricsEvaluable = true,
     ): ComponentMetrics {
         return new ComponentMetrics(
             component: new Component($name, $classInfos),
@@ -233,6 +277,7 @@ final class JsonReporterTest extends TestCase
             abstractness: $abstractness,
             distance: $distance,
             zone: $zone,
+            dependencyMetricsEvaluable: $dependencyMetricsEvaluable,
         );
     }
 }

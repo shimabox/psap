@@ -120,11 +120,25 @@ final class MermaidReporterTest extends TestCase
         self::assertStringContainsString('"App\\Infra (D=0.00)": [0.9, 0.1]', $output);
     }
 
+    public function testOmitsComponentsWithUnavailableDependencyMetrics(): void
+    {
+        $metrics = [
+            $this->metrics('App', instability: 0.0, abstractness: 0.25, distance: 0.75, evaluable: false),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $output = (new MermaidReporter())->render($data);
+
+        self::assertStringNotContainsString('"App (D=', $output);
+        self::assertStringContainsString('No components with evaluable dependency metrics', $output);
+    }
+
     private function metrics(
         string $name,
         float $instability,
         float $abstractness,
         float $distance,
+        bool $evaluable = true,
     ): ComponentMetrics {
         return new ComponentMetrics(
             component: new Component($name, []),
@@ -134,6 +148,7 @@ final class MermaidReporterTest extends TestCase
             abstractness: $abstractness,
             distance: $distance,
             zone: Zone::determine($instability, $abstractness),
+            dependencyMetricsEvaluable: $evaluable,
         );
     }
 }

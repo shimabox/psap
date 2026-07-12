@@ -195,6 +195,18 @@ final class PlantUmlReporterTest extends TestCase
         self::assertStringNotContainsString('#red', $output);
     }
 
+    public function testRendersUnavailableDependencyMetricsAsNotApplicable(): void
+    {
+        $metrics = [
+            $this->metrics('App', 0, 0, 0.0, 0.25, 0.75, Zone::None, dependencyMetricsEvaluable: false),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $output = (new PlantUmlReporter())->render($data);
+
+        self::assertStringContainsString('App\\nI=N/A A=0.25 D=N/A', $output);
+    }
+
     /**
      * @param list<ClassInfo> $classInfos
      */
@@ -207,6 +219,7 @@ final class PlantUmlReporterTest extends TestCase
         float $distance,
         Zone $zone,
         array $classInfos = [],
+        bool $dependencyMetricsEvaluable = true,
     ): ComponentMetrics {
         return new ComponentMetrics(
             component: new Component($name, $classInfos),
@@ -216,6 +229,7 @@ final class PlantUmlReporterTest extends TestCase
             abstractness: $abstractness,
             distance: $distance,
             zone: $zone,
+            dependencyMetricsEvaluable: $dependencyMetricsEvaluable,
         );
     }
 }

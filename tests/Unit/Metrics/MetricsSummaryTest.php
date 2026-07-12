@@ -13,12 +13,12 @@ use PHPUnit\Framework\TestCase;
 // MetricsSummary::from() の D 値の平均・分散（母分散）計算のテスト。
 final class MetricsSummaryTest extends TestCase
 {
-    public function testMeanAndVarianceAreZeroForEmptyMetrics(): void
+    public function testMeanAndVarianceAreNullForEmptyMetrics(): void
     {
         $summary = MetricsSummary::from([]);
 
-        self::assertSame(0.0, $summary->meanDistance);
-        self::assertSame(0.0, $summary->varianceDistance);
+        self::assertNull($summary->meanDistance);
+        self::assertNull($summary->varianceDistance);
     }
 
     public function testCalculatesMeanAndVariance(): void
@@ -37,7 +37,15 @@ final class MetricsSummaryTest extends TestCase
         self::assertEqualsWithDelta(0.5 / 3, $summary->varianceDistance, 0.0001);
     }
 
-    private function metricsWithDistance(float $distance): ComponentMetrics
+    public function testExcludesMetricsThatCannotEvaluateComponentDependencies(): void
+    {
+        $summary = MetricsSummary::from([$this->metricsWithDistance(0.75, evaluable: false)]);
+
+        self::assertNull($summary->meanDistance);
+        self::assertNull($summary->varianceDistance);
+    }
+
+    private function metricsWithDistance(float $distance, bool $evaluable = true): ComponentMetrics
     {
         $component = new Component('App\\Dummy', []);
 
@@ -49,6 +57,7 @@ final class MetricsSummaryTest extends TestCase
             abstractness: 0.0,
             distance: $distance,
             zone: Zone::None,
+            dependencyMetricsEvaluable: $evaluable,
         );
     }
 }

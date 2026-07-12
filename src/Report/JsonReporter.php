@@ -25,13 +25,15 @@ final class JsonReporter implements ReporterInterface
             'summary' => [
                 'componentCount' => count($data->componentMetrics),
                 'namespaceDepth' => $data->namespaceDepth,
-                'meanDistance' => round($data->summary->meanDistance, self::ROUND_PRECISION),
-                'varianceDistance' => round($data->summary->varianceDistance, self::ROUND_PRECISION),
+                'metricsEvaluable' => $data->summary->meanDistance !== null,
+                'meanDistance' => $this->rounded($data->summary->meanDistance),
+                'varianceDistance' => $this->rounded($data->summary->varianceDistance),
             ],
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
             'dependencies' => $data->dependencyGraph->edgeDetails,
             'cycles' => $data->cycles,
             'cyclePaths' => $data->cyclePathDetails(),
+            'cycleGroups' => $data->cycleGroups(),
             'warnings' => $data->warnings,
         ];
 
@@ -51,11 +53,12 @@ final class JsonReporter implements ReporterInterface
      * @return array{
      *     name: string,
      *     classCount: int,
-     *     ca: int,
-     *     ce: int,
-     *     instability: float,
+     *     metricsEvaluable: bool,
+     *     ca: int|null,
+     *     ce: int|null,
+     *     instability: float|null,
      *     abstractness: float,
-     *     distance: float,
+     *     distance: float|null,
      *     zone: string|null,
      *     classes: list<array{fqcn: string, kind: string}>,
      * }
@@ -65,14 +68,20 @@ final class JsonReporter implements ReporterInterface
         return [
             'name' => $metrics->component->name,
             'classCount' => count($metrics->component->classInfos),
-            'ca' => $metrics->ca,
-            'ce' => $metrics->ce,
-            'instability' => round($metrics->instability, self::ROUND_PRECISION),
+            'metricsEvaluable' => $metrics->dependencyMetricsEvaluable,
+            'ca' => $metrics->dependencyMetricsEvaluable ? $metrics->ca : null,
+            'ce' => $metrics->dependencyMetricsEvaluable ? $metrics->ce : null,
+            'instability' => $metrics->dependencyMetricsEvaluable ? round($metrics->instability, self::ROUND_PRECISION) : null,
             'abstractness' => round($metrics->abstractness, self::ROUND_PRECISION),
-            'distance' => round($metrics->distance, self::ROUND_PRECISION),
+            'distance' => $metrics->dependencyMetricsEvaluable ? round($metrics->distance, self::ROUND_PRECISION) : null,
             'zone' => $this->zoneValue($metrics->zone),
             'classes' => array_map($this->classPayload(...), $metrics->component->classInfos),
         ];
+    }
+
+    private function rounded(?float $value): ?float
+    {
+        return $value === null ? null : round($value, self::ROUND_PRECISION);
     }
 
     private function zoneValue(Zone $zone): ?string

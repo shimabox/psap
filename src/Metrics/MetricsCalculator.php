@@ -19,9 +19,15 @@ final class MetricsCalculator
     public function calculate(array $components): array
     {
         $componentNameByFqcn = $this->buildComponentNameMap($components);
+        $dependencyMetricsEvaluable = count($components) > 1;
 
         return array_map(
-            fn (Component $component): ComponentMetrics => $this->calculateFor($component, $components, $componentNameByFqcn),
+            fn (Component $component): ComponentMetrics => $this->calculateFor(
+                $component,
+                $components,
+                $componentNameByFqcn,
+                $dependencyMetricsEvaluable,
+            ),
             $components,
         );
     }
@@ -49,8 +55,12 @@ final class MetricsCalculator
      * @param list<Component> $allComponents
      * @param array<string, string> $componentNameByFqcn
      */
-    private function calculateFor(Component $component, array $allComponents, array $componentNameByFqcn): ComponentMetrics
-    {
+    private function calculateFor(
+        Component $component,
+        array $allComponents,
+        array $componentNameByFqcn,
+        bool $dependencyMetricsEvaluable,
+    ): ComponentMetrics {
         $ce = $this->countCe($component, $componentNameByFqcn);
         $ca = $this->countCa($component, $allComponents, $componentNameByFqcn);
 
@@ -80,6 +90,7 @@ final class MetricsCalculator
             abstractness: $abstractness,
             distance: $distance,
             zone: $zone,
+            dependencyMetricsEvaluable: $dependencyMetricsEvaluable,
         );
     }
 

@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Bobsap\Metrics;
 
 /**
- * 全コンポーネントの D（主系列からの距離）値を統計的にまとめた値オブジェクト。
+ * 評価可能なコンポーネントのD（主系列からの距離）を統計的にまとめた値オブジェクト。
+ * 評価可能なコンポーネントがない場合、平均と分散はnullになる。
  */
 final readonly class MetricsSummary
 {
     private function __construct(
-        public float $meanDistance,
-        public float $varianceDistance,
+        public ?float $meanDistance,
+        public ?float $varianceDistance,
     ) {
     }
 
@@ -20,14 +21,18 @@ final readonly class MetricsSummary
      */
     public static function from(array $metrics): self
     {
-        $count = count($metrics);
+        $evaluableMetrics = array_values(array_filter(
+            $metrics,
+            static fn (ComponentMetrics $componentMetrics): bool => $componentMetrics->dependencyMetricsEvaluable,
+        ));
+        $count = count($evaluableMetrics);
         if ($count === 0) {
-            return new self(0.0, 0.0);
+            return new self(null, null);
         }
 
         $distances = array_map(
             static fn (ComponentMetrics $metrics): float => $metrics->distance,
-            $metrics,
+            $evaluableMetrics,
         );
 
         $mean = array_sum($distances) / $count;

@@ -85,12 +85,14 @@ final class PlantUmlReporter implements ReporterInterface
 
     private function nodeLine(ComponentMetrics $metrics, string $nodeId): string
     {
+        $instability = $metrics->dependencyMetricsEvaluable ? sprintf('%.2f', $metrics->instability) : 'N/A';
+        $distance = $metrics->dependencyMetricsEvaluable ? sprintf('%.2f', $metrics->distance) : 'N/A';
         $label = sprintf(
-            '%s\nI=%.2f A=%.2f D=%.2f',
+            '%s\nI=%s A=%.2f D=%s',
             $this->escapeLabel($metrics->component->name),
-            $metrics->instability,
+            $instability,
             $metrics->abstractness,
-            $metrics->distance,
+            $distance,
         );
 
         $color = match ($metrics->zone) {

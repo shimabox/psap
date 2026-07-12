@@ -19,6 +19,7 @@ final readonly class ComponentMetrics
      * @param float $abstractness 抽象度（A） = 抽象型数 / 総型数
      * @param float $distance 主系列からの距離（D） = |A + I - 1|
      * @param Zone $zone 苦痛ゾーン・無駄ゾーンの判定結果
+     * @param bool $dependencyMetricsEvaluable コンポーネント間のCa / Ce / I / Dを評価できるか
      */
     public function __construct(
         public Component $component,
@@ -28,6 +29,7 @@ final readonly class ComponentMetrics
         public float $abstractness,
         public float $distance,
         public Zone $zone,
+        public bool $dependencyMetricsEvaluable = true,
     ) {
     }
 }

@@ -172,10 +172,12 @@ final class AnalyzeCommand extends Command
         $cycles = (new CycleDetector())->detect($dependencyGraph);
 
         $warnings = $analysisResult->warnings;
-        if (count($components) === 1) {
+        if ($components === []) {
+            $warnings[] = '解析可能なクラス、インターフェース、トレイト、enumが見つかりませんでした。';
+        } elseif (count($components) === 1) {
             $warnings[] = $this->hasDeeperNamespaces($analysisResult->classInfos, $components[0]->name)
                 ? 'コンポーネントが1件のみです。より細かく分析する場合は --depth を増やしてください。'
-                : 'コンポーネントが1件のみのため、コンポーネント間のCa、Ce、循環依存は評価できません。';
+                : 'コンポーネントが1件のみのため、コンポーネント間のCa、Ce、I、D、循環依存は評価できません。';
         }
 
         $reportData = new ReportData($componentMetrics, $summary, $warnings, $cycles, $dependencyGraph, $depth);
@@ -197,7 +199,8 @@ final class AnalyzeCommand extends Command
         if ($threshold !== null) {
             $exceeded = array_values(array_filter(
                 $componentMetrics,
-                static fn (ComponentMetrics $metrics): bool => $metrics->distance > $threshold,
+                static fn (ComponentMetrics $metrics): bool => $metrics->dependencyMetricsEvaluable
+                    && $metrics->distance > $threshold,
             ));
 
             if ($exceeded !== []) {
@@ -212,8 +215,17 @@ final class AnalyzeCommand extends Command
 
         if ($failOnCycle && $cycles !== []) {
             $errorOutput->writeln('<error>循環依存（ADP違反）が見つかりました:</error>');
-            foreach ($reportData->cyclePaths as $path) {
-                $errorOutput->writeln('  - Path: ' . implode(' -> ', $path));
+            foreach ($reportData->cycleGroups() as $group) {
+                $errorOutput->writeln(sprintf(
+                    '  - %d components, %s namespaces',
+                    $group['componentCount'],
+                    $group['namespaceRelation'],
+                ));
+                $errorOutput->writeln('    Components: ' . implode(', ', $group['components']));
+                $errorOutput->writeln('    Representative shortest path: ' . implode(' -> ', $group['representativePath']));
+                if ($group['omittedComponents'] !== []) {
+                    $errorOutput->writeln(sprintf('    Omitted from path: %d', count($group['omittedComponents'])));
+                }
             }
 
             return Command::FAILURE;
