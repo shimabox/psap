@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Psap\Analyzer\ClassInfo;
 use Psap\Analyzer\TypeKind;
 use Psap\Component\Component;
+use Psap\Component\DependencyGraph;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
 use Psap\Metrics\Zone;
@@ -28,9 +29,26 @@ use Psap\Report\ReportData;
  *     zone: string|null,
  *     classes: list<array{fqcn: string, kind: string}>
  * }
+ * @phpstan-type HtmlCycle array{
+ *     components: list<string>,
+ *     componentCount: int,
+ *     namespaceRelation: 'hierarchical'|'peer',
+ *     representativePath: list<string>,
+ *     omittedComponents: list<string>,
+ *     dependencies: list<array{
+ *         from: string,
+ *         to: string,
+ *         classDependencies: list<array{
+ *             from: string,
+ *             to: string,
+ *             evidence: list<array{kind: string, file: string, line: int}>
+ *         }>
+ *     }>
+ * }
  * @phpstan-type HtmlPayload array{
- *     summary: array{componentCount: int, meanDistance: float|null},
- *     components: list<HtmlComponent>
+ *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
+ *     components: list<HtmlComponent>,
+ *     cycles: list<HtmlCycle>
  * }
  */
 final class HtmlReporterTest extends TestCase
@@ -50,6 +68,8 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('<title id="chart-title"', $output);
         self::assertStringContainsString('id="tooltip"', $output);
         self::assertStringContainsString('id="inspector"', $output);
+        self::assertStringContainsString('id="cycle-panel"', $output);
+        self::assertStringContainsString('id="summary-cycles"', $output);
         self::assertStringContainsString('<html lang="en">', $output);
         self::assertStringContainsString('<select id="language">', $output);
         self::assertStringContainsString('<option value="ja">日本語</option>', $output);
@@ -58,6 +78,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('psap / アーキテクチャ検査ボード', $output);
         self::assertStringNotContainsString('不安定度と抽象度の交点。', $output);
         self::assertStringContainsString("containedClasses: '含まれるクラス'", $output);
+        self::assertStringContainsString("cycleHeading: '循環依存が検出されました'", $output);
         self::assertStringContainsString("noMatches: '絞り込みに一致するコンポーネントがありません。", $output);
         self::assertStringContainsString("metricIName: 'Instability (I)'", $output);
         self::assertStringContainsString("metricIHelp: 'Ce / (Ca + Ce).", $output);
@@ -77,6 +98,73 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('src="https://', $output);
         self::assertStringNotContainsString('href="https://', $output);
         self::assertStringNotContainsString('fetch(', $output);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testEmbedsAndRendersCycleDetailsWithClassEvidence(): void
+    {
+        $metrics = [
+            $this->metrics('App\\Domain', 0.5, 0.0, 0.5),
+            $this->metrics('App\\Infra', 0.5, 0.0, 0.5),
+        ];
+        $graph = new DependencyGraph(
+            ['App\\Domain', 'App\\Infra'],
+            [['App\\Domain', 'App\\Infra'], ['App\\Infra', 'App\\Domain']],
+            [
+                [
+                    'from' => 'App\\Domain',
+                    'to' => 'App\\Infra',
+                    'classDependencies' => [[
+                        'from' => 'App\\Domain\\Order',
+                        'to' => 'App\\Infra\\Repository',
+                        'evidence' => [[
+                            'kind' => 'parameter_type',
+                            'file' => 'src/Domain/Order.php',
+                            'line' => 12,
+                        ]],
+                    ]],
+                ],
+                [
+                    'from' => 'App\\Infra',
+                    'to' => 'App\\Domain',
+                    'classDependencies' => [[
+                        'from' => 'App\\Infra\\Repository',
+                        'to' => 'App\\Domain\\Order',
+                        'evidence' => [],
+                    ]],
+                ],
+            ],
+        );
+        $data = new ReportData(
+            $metrics,
+            MetricsSummary::from($metrics),
+            [],
+            [['App\\Domain', 'App\\Infra']],
+            $graph,
+        );
+
+        $output = (new HtmlReporter())->render($data);
+        $payload = $this->payload($output);
+
+        self::assertSame(1, $payload['summary']['cycleGroupCount']);
+        self::assertSame(['App\\Domain', 'App\\Infra'], $payload['cycles'][0]['components']);
+        self::assertSame(
+            ['App\\Domain', 'App\\Infra', 'App\\Domain'],
+            $payload['cycles'][0]['representativePath'],
+        );
+        self::assertSame(
+            [[
+                'kind' => 'parameter_type',
+                'file' => 'src/Domain/Order.php',
+                'line' => 12,
+            ]],
+            $payload['cycles'][0]['dependencies'][0]['classDependencies'][0]['evidence'],
+        );
+        self::assertStringContainsString('function renderCycles()', $output);
+        self::assertStringContainsString('function focusCycle(index)', $output);
+        self::assertStringContainsString("componentInCycle: 'Part of 1 cycle group'", $output);
     }
 
     /**
