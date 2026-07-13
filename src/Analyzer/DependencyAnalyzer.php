@@ -74,6 +74,15 @@ final class DependencyAnalyzer
                 continue;
             }
 
+            if (preg_match('//u', $code) !== 1) {
+                $warnings[] = sprintf(
+                    'UTF-8として解釈できないためスキップしました: %s（UTF-8へ変換するか、--excludeで除外してください）',
+                    $filePath,
+                );
+
+                continue;
+            }
+
             try {
                 $ast = $this->parser->parse($code);
             } catch (Error $e) {

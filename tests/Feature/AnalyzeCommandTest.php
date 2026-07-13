@@ -123,6 +123,45 @@ final class AnalyzeCommandTest extends TestCase
         self::assertStringContainsString('Fixture\\\\App\\\\Domain', $display);
     }
 
+    public function testStructuredFormatsReportInvalidUtf8FileAndContinue(): void
+    {
+        $directory = sys_get_temp_dir() . '/psap-invalid-utf8-' . uniqid();
+        mkdir($directory);
+        file_put_contents($directory . '/Valid.php', "<?php\nnamespace Fixture\\Encoding;\nclass Valid {}\n");
+        file_put_contents($directory . '/Latin1.php', "<?php\nnamespace Fixture\\Encoding;\nclass " . chr(0xA9) . " {}\n");
+
+        try {
+            foreach (['html', 'json'] as $format) {
+                $outputPath = sprintf('%s/report.%s', $directory, $format);
+                $tester = $this->commandTester();
+                $exitCode = $tester->execute(
+                    ['paths' => [$directory], '--format' => $format, '--output' => $outputPath],
+                    ['capture_stderr_separately' => true],
+                );
+
+                self::assertSame(Command::SUCCESS, $exitCode);
+                self::assertFileExists($outputPath);
+                $report = (string) file_get_contents($outputPath);
+                if ($format === 'html') {
+                    self::assertStringStartsWith('<!doctype html>', $report);
+                } else {
+                    $decoded = $this->decodeJson($report);
+                    self::assertStringContainsString('Latin1.php', implode("\n", $decoded['warnings']));
+                }
+                self::assertStringContainsString('Latin1.php', $tester->getErrorOutput());
+                self::assertStringContainsString('UTF-8', $tester->getErrorOutput());
+                self::assertStringContainsString('--exclude', $tester->getErrorOutput());
+                @unlink($outputPath);
+            }
+        } finally {
+            @unlink($directory . '/report.html');
+            @unlink($directory . '/report.json');
+            @unlink($directory . '/Valid.php');
+            @unlink($directory . '/Latin1.php');
+            @rmdir($directory);
+        }
+    }
+
     public function testPlantUmlFormatRendersDependencyGraph(): void
     {
         $tester = $this->commandTester();

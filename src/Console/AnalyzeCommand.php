@@ -210,6 +210,11 @@ final class AnalyzeCommand extends Command
             return Command::INVALID;
         }
         $analysisResult = (new DependencyAnalyzer(useDocblock: !$noDocblock, sourceRoots: $paths))->analyze($files);
+        if ($output instanceof ConsoleOutputInterface) {
+            foreach ($analysisResult->warnings as $warning) {
+                $errorOutput->writeln(sprintf('<comment>Warning: %s</comment>', $warning));
+            }
+        }
         $depth ??= (new ComponentDepthResolver())->resolve($analysisResult->classInfos);
         $components = (new ComponentClassifier())->classify($analysisResult->classInfos, $depth);
         $componentMetrics = (new MetricsCalculator())->calculate($components);
