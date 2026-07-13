@@ -52,7 +52,7 @@ psap analyze <paths>... [options]
 | オプション | 内容 | 初期値 |
 |---|---|---|
 | `--depth` | 名前空間を束ねる深さ。`auto`または1以上の整数 | `auto` |
-| `--format` | `text`、`json`、`markdown`、`mermaid`、`plantuml` | `text` |
+| `--format` | `text`、`json`、`markdown`、`html`、`mermaid`、`plantuml` | `text` |
 | `--output` | 出力先ファイル | 標準出力 |
 | `--exclude` | fnmatch形式の除外パターン。複数指定可 | なし |
 | `--threshold` | Dが指定値を超えた場合に失敗 | なし |
@@ -71,9 +71,12 @@ psap analyze <paths>... [options]
 psap analyze src/ --format text --output report.txt
 psap analyze src/ --format json --output report.json
 psap analyze src/ --format markdown --output report.md
+psap analyze src/ --format html --output report.html
 psap analyze src/ --format mermaid --output report.mmd
 psap analyze src/ --format plantuml --output report.puml
 ```
+
+`report.html`は外部アセットを必要としないため、そのままブラウザで開けます。点を選ぶと、名前空間コンポーネントの指標と所属クラスを確認できます。
 
 PlantUMLからPNGまで生成する場合は、PlantUML、Java、Graphviz、CJKフォントを含むイメージを使います。
 
