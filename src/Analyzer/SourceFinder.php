@@ -26,27 +26,46 @@ final class SourceFinder
      */
     public function find(array $directories, array $excludePatterns = []): array
     {
-        $files = [];
+        return $this->discover($directories, $excludePatterns)->selectedFiles;
+    }
+
+    /**
+     * @param list<string> $directories 探索対象ディレクトリ（複数可）
+     * @param list<string> $excludePatterns fnmatch 形式の除外パターン
+     */
+    public function discover(array $directories, array $excludePatterns = []): SourceInventory
+    {
+        /** @var array<string, bool> $selectedByRealPath */
+        $selectedByRealPath = [];
 
         foreach ($directories as $directory) {
-            foreach ($this->findInDirectory($directory, $excludePatterns) as $file) {
-                $files[] = $file;
+            foreach ($this->discoverInDirectory($directory, $excludePatterns) as $file) {
+                $path = $file['path'];
+                $isSelected = !$file['excluded'];
+
+                // 重複するルートで判定が異なる場合は、一度でも選択された結果を優先する。
+                $selectedByRealPath[$path] = ($selectedByRealPath[$path] ?? false) || $isSelected;
             }
         }
 
-        $files = $files
-            |> array_unique(...)
-            |> array_values(...);
-        sort($files);
+        $selectedFiles = array_keys(array_filter($selectedByRealPath));
+        sort($selectedFiles);
 
-        return $files;
+        return new SourceInventory(
+            selectedFiles: $selectedFiles,
+            discoveredFileCount: count($selectedByRealPath),
+            excludedFileCount: count(array_filter(
+                $selectedByRealPath,
+                static fn (bool $isSelected): bool => !$isSelected,
+            )),
+        );
     }
 
     /**
      * @param list<string> $excludePatterns
-     * @return list<string>
+     * @return list<array{path: string, excluded: bool}>
      */
-    private function findInDirectory(string $directory, array $excludePatterns): array
+    private function discoverInDirectory(string $directory, array $excludePatterns): array
     {
         $realDirectory = realpath($directory);
         if ($realDirectory === false || !is_dir($realDirectory) || !is_readable($realDirectory)) {
@@ -68,12 +87,12 @@ final class SourceFinder
 
                 $path = $fileInfo->getPathname();
                 $relativePath = ltrim(substr($path, strlen($realDirectory)), DIRECTORY_SEPARATOR);
+                $realPath = realpath($path);
 
-                if ($this->isExcluded($relativePath, $excludePatterns)) {
-                    continue;
-                }
-
-                $files[] = $path;
+                $files[] = [
+                    'path' => $realPath === false ? $path : $realPath,
+                    'excluded' => $this->isExcluded($relativePath, $excludePatterns),
+                ];
             }
         } catch (UnexpectedValueException $e) {
             throw new RuntimeException(sprintf('ディレクトリを読み取れません: %s', $directory), previous: $e);

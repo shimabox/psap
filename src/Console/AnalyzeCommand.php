@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Psap\Console;
 
 use InvalidArgumentException;
+use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\DependencyAnalyzer;
 use Psap\Analyzer\SourceFinder;
 use Psap\Baseline\CycleBaseline;
@@ -203,13 +204,21 @@ final class AnalyzeCommand extends Command
         $noDocblock = $input->getOption('no-docblock');
 
         try {
-            $files = (new SourceFinder())->find($paths, $excludePatterns);
+            $sourceInventory = (new SourceFinder())->discover($paths, $excludePatterns);
         } catch (RuntimeException $e) {
             $errorOutput->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return Command::INVALID;
         }
+        $files = $sourceInventory->selectedFiles;
         $analysisResult = (new DependencyAnalyzer(useDocblock: !$noDocblock, sourceRoots: $paths))->analyze($files);
+        $analysisCoverage = new AnalysisCoverage(
+            discovered: $sourceInventory->discoveredFileCount,
+            selected: $sourceInventory->selectedFileCount,
+            analyzed: $analysisResult->analyzedFileCount,
+            excluded: $sourceInventory->excludedFileCount,
+            skipped: $analysisResult->skippedFileCount,
+        );
         if ($output instanceof ConsoleOutputInterface) {
             foreach ($analysisResult->warnings as $warning) {
                 $errorOutput->writeln(sprintf('<comment>Warning: %s</comment>', $warning));
@@ -263,6 +272,7 @@ final class AnalyzeCommand extends Command
             $paths,
             !$noDocblock,
             $excludePatterns,
+            $analysisCoverage,
         );
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);
