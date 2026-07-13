@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Psap\Tests\Unit\Report;
 
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
 use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
@@ -102,6 +103,49 @@ final class MarkdownReporterTest extends TestCase
         self::assertStringContainsString('Mean D and variance D are not evaluable.', $output);
         self::assertStringNotContainsString('## Circular Dependencies', $output);
         self::assertStringNotContainsString('## Dependency Hotspots', $output);
+    }
+
+    public function testAddsFileCoverageToAnalysisSummary(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            analysisCoverage: new AnalysisCoverage(10_715, 8_205, 8_204, 2_510, 1),
+        );
+
+        $output = (new MarkdownReporter())->render($data);
+
+        self::assertStringContainsString('| Analysis coverage | 99.99% |', $output);
+        self::assertStringContainsString('| Discovered PHP files | 10,715 |', $output);
+        self::assertStringContainsString('| Selected PHP files | 8,205 |', $output);
+        self::assertStringContainsString('| Analyzed PHP files | 8,204 |', $output);
+        self::assertStringContainsString('| Excluded PHP files | 2,510 |', $output);
+        self::assertStringContainsString('| Skipped PHP files | 1 |', $output);
+    }
+
+    public function testRendersFileCoverageAsNotApplicableWhenNoFilesAreSelected(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            analysisCoverage: new AnalysisCoverage(5, 0, 0, 5, 0),
+        );
+
+        $output = (new MarkdownReporter())->render($data);
+
+        self::assertStringContainsString('| Analysis coverage | N/A |', $output);
+    }
+
+    public function testOmitsFileCoverageWhenUnavailable(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), []);
+
+        $output = (new MarkdownReporter())->render($data);
+
+        self::assertStringNotContainsString('| Analysis coverage |', $output);
+        self::assertStringNotContainsString('| Discovered PHP files |', $output);
     }
 
     private function metrics(

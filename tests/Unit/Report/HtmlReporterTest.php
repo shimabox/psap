@@ -6,6 +6,7 @@ namespace Psap\Tests\Unit\Report;
 
 use JsonException;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
 use Psap\Analyzer\TypeKind;
 use Psap\Component\Component;
@@ -47,6 +48,7 @@ use Psap\Report\ReportData;
  * }
  * @phpstan-type HtmlPayload array{
  *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
+ *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|int|null}|null,
  *     warnings: list<string>,
  *     components: list<HtmlComponent>,
  *     cycles: list<HtmlCycle>
@@ -72,6 +74,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('id="tooltip"', $output);
         self::assertStringContainsString('id="inspector"', $output);
         self::assertStringContainsString('id="cycle-panel"', $output);
+        self::assertStringContainsString('id="coverage-panel"', $output);
         self::assertStringContainsString('id="warning-panel"', $output);
         self::assertStringContainsString('id="summary-cycles"', $output);
         $tablePosition = strpos($output, '<section class="table-panel"');
@@ -89,6 +92,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('不安定度と抽象度の交点。', $output);
         self::assertStringContainsString("containedClasses: '含まれるクラス'", $output);
         self::assertStringContainsString("cycleHeading: '循環依存が検出されました'", $output);
+        self::assertStringContainsString("analysisCoverage: '解析カバレッジ'", $output);
         self::assertStringContainsString("analysisWarnings: '解析時の警告'", $output);
         self::assertStringContainsString("noMatches: '絞り込みに一致するコンポーネントがありません。", $output);
         self::assertStringContainsString("metricIName: 'Instability (I)'", $output);
@@ -109,6 +113,38 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('src="https://', $output);
         self::assertStringNotContainsString('href="https://', $output);
         self::assertStringNotContainsString('fetch(', $output);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testEmbedsAndRendersAnalysisCoverage(): void
+    {
+        $metrics = [$this->metrics('App\\Domain', 0.2, 0.75, 0.05)];
+        $coverage = new AnalysisCoverage(10715, 8205, 8204, 2510, 1);
+        $data = new ReportData(
+            $metrics,
+            MetricsSummary::from($metrics),
+            [],
+            analysisCoverage: $coverage,
+        );
+
+        $output = (new HtmlReporter())->render($data);
+        $payload = $this->payload($output);
+
+        self::assertSame([
+            'discovered' => 10715,
+            'selected' => 8205,
+            'analyzed' => 8204,
+            'excluded' => 2510,
+            'skipped' => 1,
+            'analysisCoverage' => 0.9999,
+        ], $payload['fileCoverage']);
+        self::assertStringContainsString('coveragePanel.hidden = coverage === null', $output);
+        self::assertStringContainsString("coveragePanel.classList.toggle('has-skips'", $output);
+        self::assertStringContainsString('Number(coverage[key]).toLocaleString(locale)', $output);
+        self::assertStringContainsString("coverageMeterLabel: '解析カバレッジ: {ratio}'", $output);
+        self::assertStringContainsString('動的参照や設定ファイルだけに書かれた依存は含まれません', $output);
     }
 
     /**

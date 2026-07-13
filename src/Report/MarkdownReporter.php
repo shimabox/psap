@@ -52,6 +52,7 @@ final class MarkdownReporter implements ReporterInterface
             sprintf('| Cycle groups | %d |', count($data->cycles)),
             sprintf('| Namespace depth | %s |', $data->namespaceDepth === null ? 'N/A' : (string) $data->namespaceDepth),
             sprintf('| Dependency metrics evaluable | %s |', $data->summary->meanDistance === null ? 'No' : 'Yes'),
+            ...$this->coverageSummary($data),
             '',
             '### Analysis Context',
             '',
@@ -62,6 +63,25 @@ final class MarkdownReporter implements ReporterInterface
         ];
 
         return $lines;
+    }
+
+    /** @return list<string> */
+    private function coverageSummary(ReportData $data): array
+    {
+        if ($data->analysisCoverage === null) {
+            return [];
+        }
+
+        $ratio = $data->analysisCoverage->ratio();
+
+        return [
+            sprintf('| Analysis coverage | %s |', $ratio === null ? 'N/A' : sprintf('%.2f%%', $ratio * 100)),
+            sprintf('| Discovered PHP files | %s |', number_format($data->analysisCoverage->discovered)),
+            sprintf('| Selected PHP files | %s |', number_format($data->analysisCoverage->selected)),
+            sprintf('| Analyzed PHP files | %s |', number_format($data->analysisCoverage->analyzed)),
+            sprintf('| Excluded PHP files | %s |', number_format($data->analysisCoverage->excluded)),
+            sprintf('| Skipped PHP files | %s |', number_format($data->analysisCoverage->skipped)),
+        ];
     }
 
     /** @return list<string> */

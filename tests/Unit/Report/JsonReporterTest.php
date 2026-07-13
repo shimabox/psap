@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Psap\Tests\Unit\Report;
 
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
 use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
@@ -49,6 +50,7 @@ use Psap\Report\ReportData;
  *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
  *     cycleGroups: list<CycleGroup>,
  *     cycleBaselineComparison: array{hasChanges: bool, newCycles: list<list<string>>, resolvedCycles: list<list<string>>}|null,
+ *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|int|null}|null,
  *     warnings: list<string>,
  * }
  */
@@ -245,6 +247,57 @@ final class JsonReporterTest extends TestCase
         $decoded = $this->decode((new JsonReporter())->render($data));
 
         self::assertSame(['パースエラーのためスキップしました: /x.php'], $decoded['warnings']);
+    }
+
+    public function testEncodesFileCoverage(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            analysisCoverage: new AnalysisCoverage(
+                discovered: 10_715,
+                selected: 8_205,
+                analyzed: 8_204,
+                excluded: 2_510,
+                skipped: 1,
+            ),
+        );
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertSame([
+            'discovered' => 10_715,
+            'selected' => 8_205,
+            'analyzed' => 8_204,
+            'excluded' => 2_510,
+            'skipped' => 1,
+            'analysisCoverage' => 8_204 / 8_205,
+        ], $decoded['fileCoverage']);
+    }
+
+    public function testEncodesFileCoverageRatioAsNullWhenNoFilesAreSelected(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            analysisCoverage: new AnalysisCoverage(5, 0, 0, 5, 0),
+        );
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertNotNull($decoded['fileCoverage']);
+        self::assertNull($decoded['fileCoverage']['analysisCoverage']);
+    }
+
+    public function testEncodesFileCoverageAsNullWhenUnavailable(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), []);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertNull($decoded['fileCoverage']);
     }
 
     public function testEncodesCycleBaselineComparison(): void
