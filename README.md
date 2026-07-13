@@ -1,6 +1,6 @@
-# bobsap
+# psap
 
-`bobsap` は、PHP コードベースを解析して *Clean Architecture*（Robert C. Martin 著）第14章「安定度・抽象度等価の原則（SAP: Stable Abstractions Principle）」のメトリクス（Ca / Ce / I / A / D）を計測する CLI ツールです。
+`psap`（PHP SAP）は、PHP コードベースを解析して *Clean Architecture*（Robert C. Martin 著）第14章「安定度・抽象度等価の原則（SAP: Stable Abstractions Principle）」のメトリクス（Ca / Ce / I / A / D）を計測する CLI ツールです。
 
 設計が変更しづらくなっている場所、依存が集中している場所、循環依存の原因を見つけるために使います。解析はローカルで完結し、外部サービスへソースコードを送りません。
 
@@ -21,14 +21,14 @@
 Dockerイメージをビルドします。
 
 ```bash
-git clone https://github.com/shimabox/bobsap.git
-docker build -t bobsap --target dist -f bobsap/docker/Dockerfile bobsap
+git clone https://github.com/shimabox/psap.git
+docker build -t psap --target dist -f psap/docker/Dockerfile psap
 ```
 
 インストールできたことを確認します。
 
 ```bash
-docker run --rm bobsap --version
+docker run --rm psap --version
 ```
 
 ### 2 レポートを作る
@@ -37,8 +37,8 @@ docker run --rm bobsap --version
 
 ```bash
 cd /path/to/your-project
-docker run --rm -v "$PWD":/workdir bobsap \
-  analyze src/ --format markdown --output bobsap-report.md
+docker run --rm -v "$PWD":/workdir psap \
+  analyze src/ --format markdown --output psap-report.md
 ```
 
 ### 3 結果を確認する
@@ -46,7 +46,7 @@ docker run --rm -v "$PWD":/workdir bobsap \
 レポートが作成されたことを確認します。
 
 ```bash
-sed -n '1,120p' bobsap-report.md
+sed -n '1,120p' psap-report.md
 ```
 
 最初に`Review Priorities`を読み、次に`Circular Dependencies`と`Dependency Hotspots`を確認します。循環依存には、原因となるクラス、構文、ファイル、行番号が表示されます。
@@ -56,7 +56,7 @@ sed -n '1,120p' bobsap-report.md
 Codexなど、解析対象のコードを読める生成AIに次のように依頼します。
 
 ```text
-bobsap-report.mdを読んで、優先して直すべき問題を3件挙げてください。
+psap-report.mdを読んで、優先して直すべき問題を3件挙げてください。
 レポートに記載されたソースコードも確認し、意図的な依存か問題のある依存かを判断してください。
 それぞれについて、判断の根拠、影響、具体的な修正方針を示してください。
 まだコードは変更しないでください。
@@ -99,8 +99,8 @@ Markdownレポートには、優先して確認する箇所、循環依存、依
 警告に従って`--depth`を増やします。
 
 ```bash
-docker run --rm -v "$PWD":/workdir bobsap \
-  analyze src/ --depth 3 --format markdown --output bobsap-report.md
+docker run --rm -v "$PWD":/workdir psap \
+  analyze src/ --depth 3 --format markdown --output psap-report.md
 ```
 
 深さを増やしても1件の場合は、名前空間が分割されていないか、解析対象の指定が狭すぎる可能性があります。
@@ -113,8 +113,8 @@ docker run --rm -v "$PWD":/workdir bobsap \
 解析対象のパスを続けて指定します。
 
 ```bash
-docker run --rm -v "$PWD":/workdir bobsap \
-  analyze src/ packages/ --format markdown --output bobsap-report.md
+docker run --rm -v "$PWD":/workdir psap \
+  analyze src/ packages/ --format markdown --output psap-report.md
 ```
 
 </details>
@@ -124,7 +124,7 @@ docker run --rm -v "$PWD":/workdir bobsap \
 Dが閾値を超えた場合や、循環依存が見つかった場合に終了コード`1`を返せます。
 
 ```bash
-docker run --rm -v "$PWD":/workdir bobsap \
+docker run --rm -v "$PWD":/workdir psap \
   analyze src/ --threshold 0.6 --fail-on-cycle
 ```
 

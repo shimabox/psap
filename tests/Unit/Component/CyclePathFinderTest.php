@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Component;
+namespace Psap\Tests\Unit\Component;
 
-use Bobsap\Component\CyclePathFinder;
-use Bobsap\Component\DependencyGraph;
 use PHPUnit\Framework\TestCase;
+use Psap\Component\CyclePathFinder;
+use Psap\Component\DependencyGraph;
 
 final class CyclePathFinderTest extends TestCase
 {

@@ -6,7 +6,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit;
+namespace Psap\Tests\Unit;
 
 use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;

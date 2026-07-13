@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Report;
+namespace Psap\Tests\Unit\Report;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\TypeKind;
-use Bobsap\Baseline\CycleBaselineComparison;
-use Bobsap\Component\Component;
-use Bobsap\Component\DependencyGraph;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\MetricsSummary;
-use Bobsap\Metrics\Zone;
-use Bobsap\Report\JsonReporter;
-use Bobsap\Report\ReportData;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\TypeKind;
+use Psap\Baseline\CycleBaselineComparison;
+use Psap\Component\Component;
+use Psap\Component\DependencyGraph;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\MetricsSummary;
+use Psap\Metrics\Zone;
+use Psap\Report\JsonReporter;
+use Psap\Report\ReportData;
 
 /**
  * JsonReporter のJSONスキーマを固定するテスト。

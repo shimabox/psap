@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Metrics;
+namespace Psap\Tests\Unit\Metrics;
 
-use Bobsap\Component\Component;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\MetricsSummary;
-use Bobsap\Metrics\Zone;
 use PHPUnit\Framework\TestCase;
+use Psap\Component\Component;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\MetricsSummary;
+use Psap\Metrics\Zone;
 
 // MetricsSummary::from() の D 値の平均・分散（母分散）計算のテスト。
 final class MetricsSummaryTest extends TestCase

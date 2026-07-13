@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer;
+namespace Psap\Analyzer;
 
 /**
  * 1つの型宣言（class / interface / enum / trait）の情報を表す値オブジェクト。

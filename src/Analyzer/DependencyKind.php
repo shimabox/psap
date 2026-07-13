@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer;
+namespace Psap\Analyzer;
 
 enum DependencyKind: string
 {

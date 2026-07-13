@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Component;
+namespace Psap\Component;
 
-use Bobsap\Analyzer\ClassInfo;
+use Psap\Analyzer\ClassInfo;
 
 /**
  * コンポーネント（名前空間で束ねたクラス群）を表す値オブジェクト。

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Analyzer;
+namespace Psap\Tests\Unit\Analyzer;
 
-use Bobsap\Analyzer\Internal\DocblockTypeExtractor;
 use PhpParser\ErrorHandler\Throwing;
 use PhpParser\NameContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\Internal\DocblockTypeExtractor;
 
 // DocblockTypeExtractor: docblock の型文字列（@var / @param / @return / @throws）を
 // クラス名候補の FQCN 一覧に分解するテスト。

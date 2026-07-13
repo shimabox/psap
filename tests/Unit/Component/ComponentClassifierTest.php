@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Component;
+namespace Psap\Tests\Unit\Component;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\TypeKind;
-use Bobsap\Component\Component;
-use Bobsap\Component\ComponentClassifier;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\TypeKind;
+use Psap\Component\Component;
+use Psap\Component\ComponentClassifier;
 
 // ComponentClassifier が depth 指定で名前空間をコンポーネントに束ねることのテスト。
 // depth より「深い / ちょうど / 浅い」名前空間の境界と、グローバル名前空間の扱いを確認する。

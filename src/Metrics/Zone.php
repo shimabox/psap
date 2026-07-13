@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Metrics;
+namespace Psap\Metrics;
 
 /**
  * コンポーネントが「主系列」から見て問題領域（ゾーン）にあるかどうか。

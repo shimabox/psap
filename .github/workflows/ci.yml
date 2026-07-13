@@ -1,6 +1,6 @@
 # CI ワークフロー。
 #   checks       … PHP 8.5 で composer validate / test / stan / cs を実行
-#   self-metrics … checks 成功後、bobsap 自身で src/ を計測し（ドッグフーディング）、
+#   self-metrics … checks 成功後、psap 自身で src/ を計測し（ドッグフーディング）、
 #                   レポートを Artifact 化 + Step Summary に表示。循環依存があれば失敗させる
 name: CI
 
@@ -50,7 +50,7 @@ jobs:
         run: composer cs
 
   self-metrics:
-    name: self-metrics（bobsap で bobsap を計測）
+    name: self-metrics（psap で psap を計測）
     needs: checks
     runs-on: ubuntu-latest
     steps:
@@ -75,27 +75,27 @@ jobs:
         run: composer install --prefer-dist --no-progress
 
       - name: レポート出力先ディレクトリを用意
-        run: mkdir -p bobsap-report
+        run: mkdir -p psap-report
 
       # text レポートを出力しつつ、--fail-on-cycle で循環依存（ADP違反）が
       # ないことを CI ゲートにする（見つかれば exit code 1 でジョブが失敗する）
       - name: 自己計測（text + 循環依存ゲート）
-        run: php bin/bobsap analyze src/ --format text --output bobsap-report/report.txt --fail-on-cycle
+        run: php bin/psap analyze src/ --format text --output psap-report/report.txt --fail-on-cycle
 
       - name: 自己計測（mermaid）
-        run: php bin/bobsap analyze src/ --format mermaid --output bobsap-report/report.mmd
+        run: php bin/psap analyze src/ --format mermaid --output psap-report/report.mmd
 
       - name: 自己計測（plantuml）
-        run: php bin/bobsap analyze src/ --format plantuml --output bobsap-report/report.puml
+        run: php bin/psap analyze src/ --format plantuml --output psap-report/report.puml
 
       - name: 自己計測（json）
-        run: php bin/bobsap analyze src/ --format json --output bobsap-report/report.json
+        run: php bin/psap analyze src/ --format json --output psap-report/report.json
 
       - name: レポートを Artifact にアップロード
         uses: actions/upload-artifact@v4
         with:
-          name: bobsap-report
-          path: bobsap-report/
+          name: psap-report
+          path: psap-report/
           retention-days: 30
 
       # text の表と mermaid の I/A 図を Step Summary に表示する。
@@ -104,12 +104,12 @@ jobs:
       - name: Step Summary に結果を書き込む
         run: |
           {
-            echo "## bobsap self metrics (src/)"
+            echo "## psap self metrics (src/)"
             echo '```'
-            cat bobsap-report/report.txt
+            cat psap-report/report.txt
             echo '```'
             echo "### I/A グラフ"
             echo '```mermaid'
-            cat bobsap-report/report.mmd
+            cat psap-report/report.mmd
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

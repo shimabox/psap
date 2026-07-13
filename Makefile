@@ -22,15 +22,15 @@ cs: ## コーディングスタイルをチェックする（dry-run）
 cs-fix: ## コーディングスタイルを自動整形する
 	docker compose run --rm app composer cs:fix
 
-phar: ## bobsap.phar を生成する（docker/Dockerfile の phar ステージ、clue/phar-composer を利用）
-	docker build -t bobsap-phar-builder --target phar -f docker/Dockerfile .
-	docker run --rm --entrypoint cat bobsap-phar-builder /app/bobsap.phar > bobsap.phar
-	chmod +x bobsap.phar
-	docker rmi bobsap-phar-builder > /dev/null
-	@echo "Generated: bobsap.phar"
+phar: ## psap.phar を生成する（docker/Dockerfile の phar ステージ、clue/phar-composer を利用）
+	docker build -t psap-phar-builder --target phar -f docker/Dockerfile .
+	docker run --rm --entrypoint cat psap-phar-builder /app/psap.phar > psap.phar
+	chmod +x psap.phar
+	docker rmi psap-phar-builder > /dev/null
+	@echo "Generated: psap.phar"
 
-build-dist: ## 配布用の実行イメージをビルドする（bobsap:dist タグ）
-	docker build -t bobsap:dist --target dist -f docker/Dockerfile .
+build-dist: ## 配布用の実行イメージをビルドする（psap:dist タグ）
+	docker build -t psap:dist --target dist -f docker/Dockerfile .
 
-build-plantuml: ## PlantUML 同梱の配布用イメージをビルドする（bobsap:plantuml タグ）
-	docker build -t bobsap:plantuml --target dist-plantuml -f docker/Dockerfile .
+build-plantuml: ## PlantUML 同梱の配布用イメージをビルドする（psap:plantuml タグ）
+	docker build -t psap:plantuml --target dist-plantuml -f docker/Dockerfile .

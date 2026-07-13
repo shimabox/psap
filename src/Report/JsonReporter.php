@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Report;
+namespace Psap\Report;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\Zone;
 use JsonException;
+use Psap\Analyzer\ClassInfo;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\Zone;
 
 /**
  * 機械可読な JSON レポート。

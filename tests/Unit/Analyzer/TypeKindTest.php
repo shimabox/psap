@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Analyzer;
+namespace Psap\Tests\Unit\Analyzer;
 
-use Bobsap\Analyzer\TypeKind;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\TypeKind;
 
 // TypeKind::isAbstract() が「抽象型（interface / abstract class）」のときだけ true を返すことのテスト
 final class TypeKindTest extends TestCase

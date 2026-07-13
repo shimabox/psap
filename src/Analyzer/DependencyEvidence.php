@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer;
+namespace Psap\Analyzer;
 
 final readonly class DependencyEvidence
 {

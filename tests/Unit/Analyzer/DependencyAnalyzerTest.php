@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Analyzer;
+namespace Psap\Tests\Unit\Analyzer;
 
-use Bobsap\Analyzer\AnalysisResult;
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\DependencyAnalyzer;
-use Bobsap\Analyzer\DependencyKind;
-use Bobsap\Analyzer\SourceFinder;
-use Bobsap\Analyzer\TypeKind;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\AnalysisResult;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyAnalyzer;
+use Psap\Analyzer\DependencyKind;
+use Psap\Analyzer\SourceFinder;
+use Psap\Analyzer\TypeKind;
 
 // DependencyAnalyzer: 型種別の判定・依存関係抽出（数えるもの一式）・
 // グローバル名前空間・パースエラー時の警告とスキップ・無名クラスの扱いのテスト
@@ -610,7 +610,7 @@ final class DependencyAnalyzerTest extends TestCase
 
     private function createTempFile(string $code): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'bobsap_') . '.php';
+        $path = tempnam(sys_get_temp_dir(), 'psap_') . '.php';
         file_put_contents($path, $code);
         $this->tempFiles[] = $path;
 

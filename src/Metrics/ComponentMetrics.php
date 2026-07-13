@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Metrics;
+namespace Psap\Metrics;
 
-use Bobsap\Component\Component;
+use Psap\Component\Component;
 
 /**
  * 1コンポーネント分の計測結果。

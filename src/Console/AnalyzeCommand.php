@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Console;
+namespace Psap\Console;
 
-use Bobsap\Analyzer\DependencyAnalyzer;
-use Bobsap\Analyzer\SourceFinder;
-use Bobsap\Baseline\CycleBaseline;
-use Bobsap\Component\ComponentClassifier;
-use Bobsap\Component\ComponentDepthResolver;
-use Bobsap\Component\CycleDetector;
-use Bobsap\Component\DependencyGraph;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\MetricsCalculator;
-use Bobsap\Metrics\MetricsSummary;
-use Bobsap\Report\JsonReporter;
-use Bobsap\Report\MarkdownReporter;
-use Bobsap\Report\MermaidReporter;
-use Bobsap\Report\PlantUmlReporter;
-use Bobsap\Report\ReportData;
-use Bobsap\Report\ReporterInterface;
-use Bobsap\Report\TextReporter;
 use InvalidArgumentException;
+use Psap\Analyzer\DependencyAnalyzer;
+use Psap\Analyzer\SourceFinder;
+use Psap\Baseline\CycleBaseline;
+use Psap\Component\ComponentClassifier;
+use Psap\Component\ComponentDepthResolver;
+use Psap\Component\CycleDetector;
+use Psap\Component\DependencyGraph;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\MetricsCalculator;
+use Psap\Metrics\MetricsSummary;
+use Psap\Report\JsonReporter;
+use Psap\Report\MarkdownReporter;
+use Psap\Report\MermaidReporter;
+use Psap\Report\PlantUmlReporter;
+use Psap\Report\ReportData;
+use Psap\Report\ReporterInterface;
+use Psap\Report\TextReporter;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -334,7 +334,7 @@ final class AnalyzeCommand extends Command
     }
 
     /**
-     * @param list<\Bobsap\Analyzer\ClassInfo> $classInfos
+     * @param list<\Psap\Analyzer\ClassInfo> $classInfos
      */
     private function hasDeeperNamespaces(array $classInfos, string $componentName): bool
     {

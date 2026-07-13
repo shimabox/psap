@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Metrics;
+namespace Psap\Metrics;
 
 /**
  * 評価可能なコンポーネントのD（主系列からの距離）を統計的にまとめた値オブジェクト。

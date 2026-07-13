@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Baseline;
+namespace Psap\Tests\Unit\Baseline;
 
-use Bobsap\Baseline\CycleBaseline;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use Psap\Baseline\CycleBaseline;
 
 final class CycleBaselineTest extends TestCase
 {

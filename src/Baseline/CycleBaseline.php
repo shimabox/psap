@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Baseline;
+namespace Psap\Baseline;
 
 use InvalidArgumentException;
 use JsonException;

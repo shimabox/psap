@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Analyzer;
+namespace Psap\Tests\Unit\Analyzer;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\DependencyEvidence;
-use Bobsap\Analyzer\DependencyKind;
-use Bobsap\Analyzer\TypeKind;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyEvidence;
+use Psap\Analyzer\DependencyKind;
+use Psap\Analyzer\TypeKind;
 
 // ClassInfo が値オブジェクトとして「依存先の重複排除」「自分自身の除外」を
 // コンストラクタ内で保証することのテスト

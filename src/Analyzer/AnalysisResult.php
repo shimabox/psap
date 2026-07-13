@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer;
+namespace Psap\Analyzer;
 
 /**
  * DependencyAnalyzer::analyze() の結果。

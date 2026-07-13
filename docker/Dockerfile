@@ -2,7 +2,7 @@
 #   dev           … 開発用（compose.yaml から利用。vendor はホストのバインドマウント頼み）
 #   vendor        … 配布用イメージのための composer install 専用ステージ
 #   dist          … 配布用の実行イメージ（デフォルトの build target）
-#   phar          … bobsap.phar 生成専用ステージ（`make phar` から利用。配布物には含めない）
+#   phar          … psap.phar 生成専用ステージ（`make phar` から利用。配布物には含めない）
 #   dist-plantuml … PlantUML レンダラー同梱の実行イメージ（analyze して即 PNG まで出す用）
 
 # ---- dev: 開発用ステージ -----------------------------------------------
@@ -37,9 +37,9 @@ COPY bin ./bin
 
 WORKDIR /workdir
 
-ENTRYPOINT ["php", "/app/bin/bobsap"]
+ENTRYPOINT ["php", "/app/bin/psap"]
 
-# ---- phar: bobsap.phar 生成専用ステージ ---------------------------------
+# ---- phar: psap.phar 生成専用ステージ ---------------------------------
 # clue/phar-composer は本体の composer.json を汚さないよう、ダウンロードした
 # phar-composer.phar を直接 php で叩く（バージョン固定）。
 FROM vendor AS phar
@@ -52,7 +52,7 @@ COPY bin ./bin
 
 ADD https://github.com/clue/phar-composer/releases/download/v${PHAR_COMPOSER_VERSION}/phar-composer-${PHAR_COMPOSER_VERSION}.phar /usr/local/bin/phar-composer.phar
 RUN chmod +x /usr/local/bin/phar-composer.phar \
-    && php -d phar.readonly=0 /usr/local/bin/phar-composer.phar build . /app/bobsap.phar
+    && php -d phar.readonly=0 /usr/local/bin/phar-composer.phar build . /app/psap.phar
 
 # ---- dist-plantuml: PlantUML 同梱の配布用実行イメージ ---------------------
 # dist と同じ内容 + Java（PlantUML 実行用）+ plantuml.jar + CJK フォント。

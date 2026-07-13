@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Metrics;
+namespace Psap\Metrics;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Component\Component;
+use Psap\Analyzer\ClassInfo;
+use Psap\Component\Component;
 
 /**
  * Component[] から Ca / Ce / I / A / D / ゾーンを計算する。

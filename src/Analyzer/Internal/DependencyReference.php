@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer\Internal;
+namespace Psap\Analyzer\Internal;
 
-use Bobsap\Analyzer\DependencyKind;
+use Psap\Analyzer\DependencyKind;
 
 final readonly class DependencyReference
 {

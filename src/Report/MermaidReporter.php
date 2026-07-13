@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Report;
+namespace Psap\Report;
 
-use Bobsap\Metrics\ComponentMetrics;
+use Psap\Metrics\ComponentMetrics;
 
 /**
  * Mermaid の quadrantChart で I/A 散布図を出力するレポーター。

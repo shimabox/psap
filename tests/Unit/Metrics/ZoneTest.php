@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Metrics;
+namespace Psap\Tests\Unit\Metrics;
 
-use Bobsap\Metrics\Zone;
 use PHPUnit\Framework\TestCase;
+use Psap\Metrics\Zone;
 
 // Zone::determine() のゾーン判定境界値のテスト。
 // (0,0) からの距離 < 0.5 なら苦痛ゾーン、(1,1) からの距離 < 0.5 なら無駄ゾーン。

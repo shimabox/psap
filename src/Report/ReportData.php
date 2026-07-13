@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Report;
+namespace Psap\Report;
 
-use Bobsap\Baseline\CycleBaselineComparison;
-use Bobsap\Component\Component;
-use Bobsap\Component\CyclePathFinder;
-use Bobsap\Component\DependencyGraph;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\MetricsSummary;
+use Psap\Baseline\CycleBaselineComparison;
+use Psap\Component\Component;
+use Psap\Component\CyclePathFinder;
+use Psap\Component\DependencyGraph;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\MetricsSummary;
 
 /**
  * レンダラー（Reporter）共通の入力データ。

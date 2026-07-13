@@ -1,6 +1,6 @@
 {
-    "name": "shimabox/bobsap",
-    "description": "A CLI tool that measures dependency management metrics (Stable Abstractions Principle) for PHP codebases.",
+    "name": "shimabox/psap",
+    "description": "PSAP (PHP SAP) measures Stable Abstractions Principle metrics for PHP codebases.",
     "type": "project",
     "license": "MIT",
     "require": {
@@ -16,16 +16,16 @@
     },
     "autoload": {
         "psr-4": {
-            "Bobsap\\": "src/"
+            "Psap\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Bobsap\\Tests\\": "tests/"
+            "Psap\\Tests\\": "tests/"
         }
     },
     "bin": [
-        "bin/bobsap"
+        "bin/psap"
     ],
     "scripts": {
         "test": "phpunit",

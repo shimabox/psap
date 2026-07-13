@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Component;
+namespace Psap\Tests\Unit\Component;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\DependencyEvidence;
-use Bobsap\Analyzer\DependencyKind;
-use Bobsap\Analyzer\TypeKind;
-use Bobsap\Component\Component;
-use Bobsap\Component\DependencyGraph;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyEvidence;
+use Psap\Analyzer\DependencyKind;
+use Psap\Analyzer\TypeKind;
+use Psap\Component\Component;
+use Psap\Component\DependencyGraph;
 
 // DependencyGraph: Component[] からのノード/エッジ導出のテスト。
 // 導出ロジックはもともと PlantUmlReporter の private メソッドにあったものと同一

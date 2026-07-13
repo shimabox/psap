@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer\Internal;
+namespace Psap\Analyzer\Internal;
 
-use Bobsap\Analyzer\DependencyKind;
 use PhpParser\NameContext;
 use PhpParser\Node;
 use PhpParser\Node\ComplexType;
@@ -19,6 +18,7 @@ use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\UnionType;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
+use Psap\Analyzer\DependencyKind;
 
 /**
  * 1つの型宣言から依存先と、その依存を作った構文の種類・行番号を集める。

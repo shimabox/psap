@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Report;
+namespace Psap\Report;
 
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\Zone;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\Zone;
 
 /**
  * PlantUML でコンポーネント依存グラフを出力するレポーター。
@@ -31,7 +31,7 @@ final class PlantUmlReporter implements ReporterInterface
 
         $lines = [];
         $lines[] = '@startuml';
-        $lines[] = "' bobsap - SAP metrics";
+        $lines[] = "' psap - SAP metrics";
         $lines[] = 'skinparam rectangle {';
         $lines[] = '  BackgroundColor White';
         $lines[] = '  BorderColor Black';

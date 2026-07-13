@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer\Internal;
+namespace Psap\Analyzer\Internal;
 
 use PhpParser\NameContext;
 use PhpParser\Node;

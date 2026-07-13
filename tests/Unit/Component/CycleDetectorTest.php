@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Component;
+namespace Psap\Tests\Unit\Component;
 
-use Bobsap\Component\CycleDetector;
-use Bobsap\Component\DependencyGraph;
 use PHPUnit\Framework\TestCase;
+use Psap\Component\CycleDetector;
+use Psap\Component\DependencyGraph;
 
 // CycleDetector: Tarjan の強連結成分（SCC）検出による循環依存（ADP違反）検出のテスト。
 // サイズ1のSCC（循環していない単独ノード）は結果に含まれないことも確認する

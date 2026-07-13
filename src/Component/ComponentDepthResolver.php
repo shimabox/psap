@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Component;
+namespace Psap\Component;
 
-use Bobsap\Analyzer\ClassInfo;
+use Psap\Analyzer\ClassInfo;
 
 /**
  * 共通名前空間の直下をコンポーネントとして分ける深さを求める。

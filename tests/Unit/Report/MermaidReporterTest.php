@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Report;
+namespace Psap\Tests\Unit\Report;
 
-use Bobsap\Component\Component;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\MetricsSummary;
-use Bobsap\Metrics\Zone;
-use Bobsap\Report\MermaidReporter;
-use Bobsap\Report\ReportData;
 use PHPUnit\Framework\TestCase;
+use Psap\Component\Component;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\MetricsSummary;
+use Psap\Metrics\Zone;
+use Psap\Report\MermaidReporter;
+use Psap\Report\ReportData;
 
 // MermaidReporter: quadrantChart のヘッダ構造・点の座標（クランプ含む）・ラベルの D 値・
 // 象限ラベル（ゾーンの意味づけ）のテスト

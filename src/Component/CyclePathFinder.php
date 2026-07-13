@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Component;
+namespace Psap\Component;
 
 /**
  * 強連結成分ごとに、実際に一周する最短の代表経路を選ぶ。

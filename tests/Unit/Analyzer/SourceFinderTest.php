@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Analyzer;
+namespace Psap\Tests\Unit\Analyzer;
 
-use Bobsap\Analyzer\SourceFinder;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\SourceFinder;
 use RuntimeException;
 
 // SourceFinder: 指定ディレクトリからの .php 再帰列挙・exclude パターン・ソート順のテスト

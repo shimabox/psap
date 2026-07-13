@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Component;
+namespace Psap\Tests\Unit\Component;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\TypeKind;
-use Bobsap\Component\ComponentDepthResolver;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\TypeKind;
+use Psap\Component\ComponentDepthResolver;
 
 final class ComponentDepthResolverTest extends TestCase
 {

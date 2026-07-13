@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Component;
+namespace Psap\Component;
 
-use Bobsap\Analyzer\DependencyEvidence;
+use Psap\Analyzer\DependencyEvidence;
 
 /**
  * コンポーネント間依存グラフの値オブジェクト。

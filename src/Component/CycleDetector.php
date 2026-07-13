@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Component;
+namespace Psap\Component;
 
 /**
  * DependencyGraph から循環依存（ADP違反）を検出する。

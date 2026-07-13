@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Metrics;
+namespace Psap\Tests\Unit\Metrics;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\TypeKind;
-use Bobsap\Component\Component;
-use Bobsap\Metrics\MetricsCalculator;
-use Bobsap\Metrics\Zone;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\TypeKind;
+use Psap\Component\Component;
+use Psap\Metrics\MetricsCalculator;
+use Psap\Metrics\Zone;
 
 // MetricsCalculator の Ca/Ce/I/A/D 計算のテスト。
 // クラス→コンポーネント対応表を使い、対応表にないクラス（解析対象外）への依存を無視すること、

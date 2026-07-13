@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Report;
+namespace Psap\Report;
 
 /**
  * レポートを文字列として描画するレンダラーのインターフェイス。

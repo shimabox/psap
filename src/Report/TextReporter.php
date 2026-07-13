@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Report;
+namespace Psap\Report;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\Zone;
+use Psap\Analyzer\ClassInfo;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\Zone;
 
 /**
  * 人間向けのテキスト表レポート。
@@ -33,7 +33,7 @@ final class TextReporter implements ReporterInterface
     public function render(ReportData $data): string
     {
         $lines = [];
-        $lines[] = 'bobsap - Stable Abstractions Principle metrics';
+        $lines[] = 'psap - Stable Abstractions Principle metrics';
         if ($data->namespaceDepth !== null) {
             $lines[] = sprintf('Namespace depth: %d', $data->namespaceDepth);
         }

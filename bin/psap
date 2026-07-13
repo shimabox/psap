@@ -1,15 +1,15 @@
 #!/usr/bin/env php
 <?php
 
-// bobsap CLI のエントリポイント。
+// psap CLI のエントリポイント。
 
 declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Bobsap\Console\AnalyzeCommand;
+use Psap\Console\AnalyzeCommand;
 use Symfony\Component\Console\Application;
 
-$application = new Application('bobsap', '0.1.0');
+$application = new Application('psap', '0.1.0');
 $application->add(new AnalyzeCommand());
 $application->run();

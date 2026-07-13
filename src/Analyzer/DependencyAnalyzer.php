@@ -2,12 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Analyzer;
+namespace Psap\Analyzer;
 
-use Bobsap\Analyzer\Internal\DependencyNameCollector;
-use Bobsap\Analyzer\Internal\DependencyReference;
-use Bobsap\Analyzer\Internal\DocblockTypeExtractor;
-use Bobsap\Analyzer\Internal\RootClassLikeCollector;
 use PhpParser\Error;
 use PhpParser\NameContext;
 use PhpParser\Node\Stmt;
@@ -16,6 +12,10 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\Parser;
 use PhpParser\ParserFactory;
+use Psap\Analyzer\Internal\DependencyNameCollector;
+use Psap\Analyzer\Internal\DependencyReference;
+use Psap\Analyzer\Internal\DocblockTypeExtractor;
+use Psap\Analyzer\Internal\RootClassLikeCollector;
 
 /**
  * PHP ソースファイル群を解析し、型宣言ごとの依存関係（ClassInfo）を抽出する。

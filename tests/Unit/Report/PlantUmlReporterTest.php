@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Unit\Report;
+namespace Psap\Tests\Unit\Report;
 
-use Bobsap\Analyzer\ClassInfo;
-use Bobsap\Analyzer\TypeKind;
-use Bobsap\Component\Component;
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\MetricsSummary;
-use Bobsap\Metrics\Zone;
-use Bobsap\Report\PlantUmlReporter;
-use Bobsap\Report\ReportData;
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\TypeKind;
+use Psap\Component\Component;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\MetricsSummary;
+use Psap\Metrics\Zone;
+use Psap\Report\PlantUmlReporter;
+use Psap\Report\ReportData;
 
 // PlantUmlReporter: @startuml/@enduml・ノードのメトリクスラベル・ゾーン色・
 // エッジ集約（同じコンポーネントペアの複数クラス依存は1本）・対象外依存の無視のテスト
@@ -108,7 +108,7 @@ final class PlantUmlReporterTest extends TestCase
     }
 
     // エッジ導出（集約・対象外依存の無視・コンポーネント内依存の無視）のテストは
-    // Bobsap\Component\DependencyGraph に共有クラスとして抽出済みのため、そちらに移設した
+    // Psap\Component\DependencyGraph に共有クラスとして抽出済みのため、そちらに移設した
     // （tests/Unit/Component/DependencyGraphTest.php）。ここではレンダリング結果のみ検証する。
     public function testRendersEdgeBetweenComponents(): void
     {

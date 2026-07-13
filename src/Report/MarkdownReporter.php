@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Report;
+namespace Psap\Report;
 
-use Bobsap\Metrics\ComponentMetrics;
-use Bobsap\Metrics\Zone;
+use Psap\Metrics\ComponentMetrics;
+use Psap\Metrics\Zone;
 
 /**
  * 生成AIと人間のレビューに必要な情報を優先度順にまとめるMarkdownレポート。
@@ -40,7 +40,7 @@ final class MarkdownReporter implements ReporterInterface
         ));
 
         $lines = [
-            '# bobsap Architecture Analysis',
+            '# psap Architecture Analysis',
             '',
             '## Analysis Summary',
             '',

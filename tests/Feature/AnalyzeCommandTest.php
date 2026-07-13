@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Bobsap\Tests\Feature;
+namespace Psap\Tests\Feature;
 
-use Bobsap\Console\AnalyzeCommand;
 use PHPUnit\Framework\TestCase;
+use Psap\Console\AnalyzeCommand;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -62,7 +62,7 @@ final class AnalyzeCommandTest extends TestCase
         $exitCode = $tester->execute(['paths' => [self::SIMPLE_PROJECT]]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
-        self::assertStringContainsString('bobsap - Stable Abstractions Principle metrics', $tester->getDisplay());
+        self::assertStringContainsString('psap - Stable Abstractions Principle metrics', $tester->getDisplay());
         self::assertStringContainsString('Statistics: mean(D)=', $tester->getDisplay());
     }
 
@@ -89,7 +89,7 @@ final class AnalyzeCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $exitCode);
         $display = $tester->getDisplay();
-        self::assertStringContainsString('# bobsap Architecture Analysis', $display);
+        self::assertStringContainsString('# psap Architecture Analysis', $display);
         self::assertStringContainsString('## Review Priorities', $display);
         self::assertStringContainsString('## Circular Dependencies', $display);
         self::assertStringContainsString('`parameter_type` at `A/Foo.php:', $display);
@@ -441,7 +441,7 @@ final class AnalyzeCommandTest extends TestCase
 
     public function testOutputOptionWritesToFileInsteadOfStdout(): void
     {
-        $outputPath = sys_get_temp_dir() . '/bobsap-analyze-command-test-' . uniqid() . '.txt';
+        $outputPath = sys_get_temp_dir() . '/psap-analyze-command-test-' . uniqid() . '.txt';
 
         try {
             $tester = $this->commandTester();
@@ -450,7 +450,7 @@ final class AnalyzeCommandTest extends TestCase
             self::assertSame(Command::SUCCESS, $exitCode);
             self::assertSame('', $tester->getDisplay());
             self::assertFileExists($outputPath);
-            self::assertStringContainsString('bobsap - Stable Abstractions Principle metrics', (string) file_get_contents($outputPath));
+            self::assertStringContainsString('psap - Stable Abstractions Principle metrics', (string) file_get_contents($outputPath));
         } finally {
             if (file_exists($outputPath)) {
                 unlink($outputPath);
@@ -461,7 +461,7 @@ final class AnalyzeCommandTest extends TestCase
     public function testUnwritableOutputPathExitsWithFailureCode(): void
     {
         $tester = $this->commandTester();
-        $outputPath = sys_get_temp_dir() . '/bobsap-missing-' . uniqid() . '/report.txt';
+        $outputPath = sys_get_temp_dir() . '/psap-missing-' . uniqid() . '/report.txt';
 
         $tester->execute(
             ['paths' => [self::SIMPLE_PROJECT], '--output' => $outputPath],
@@ -551,7 +551,7 @@ final class AnalyzeCommandTest extends TestCase
 
     private function commandTester(): CommandTester
     {
-        $application = new Application('bobsap', 'test');
+        $application = new Application('psap', 'test');
         $application->add(new AnalyzeCommand());
         $command = $application->find('analyze');
 
@@ -560,7 +560,7 @@ final class AnalyzeCommandTest extends TestCase
 
     private function temporaryBaselinePath(): string
     {
-        return sys_get_temp_dir() . '/bobsap-cycle-baseline-' . uniqid() . '.json';
+        return sys_get_temp_dir() . '/psap-cycle-baseline-' . uniqid() . '.json';
     }
 
     /** @return JsonReport */
