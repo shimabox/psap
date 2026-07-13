@@ -15,6 +15,7 @@ use Psap\Component\DependencyGraph;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsCalculator;
 use Psap\Metrics\MetricsSummary;
+use Psap\Report\HtmlReporter;
 use Psap\Report\JsonReporter;
 use Psap\Report\MarkdownReporter;
 use Psap\Report\MermaidReporter;
@@ -268,7 +269,7 @@ final class AnalyzeCommand extends Command
                 return Command::FAILURE;
             }
         } else {
-            $output->writeln($rendered);
+            $output->write($rendered . PHP_EOL, false, $format === 'html' ? OutputInterface::OUTPUT_RAW : OutputInterface::OUTPUT_NORMAL);
         }
 
         if ($threshold !== null) {
@@ -380,6 +381,7 @@ final class AnalyzeCommand extends Command
             'text' => static fn (bool $verbose): ReporterInterface => new TextReporter($verbose),
             'json' => static fn (bool $verbose): ReporterInterface => new JsonReporter(),
             'markdown' => static fn (bool $verbose): ReporterInterface => new MarkdownReporter(),
+            'html' => static fn (bool $verbose): ReporterInterface => new HtmlReporter(),
             'mermaid' => static fn (bool $verbose): ReporterInterface => new MermaidReporter(),
             'plantuml' => static fn (bool $verbose): ReporterInterface => new PlantUmlReporter(),
         ];

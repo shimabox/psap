@@ -51,6 +51,15 @@ sed -n '1,120p' psap-report.md
 
 最初に`Review Priorities`を読み、次に`Circular Dependencies`と`Dependency Hotspots`を確認します。循環依存には、原因となるクラス、構文、ファイル、行番号が表示されます。
 
+IとAの分布をブラウザで確認する場合は、自己完結HTMLも生成できます。
+
+```bash
+docker run --rm -v "$PWD":/workdir psap \
+  analyze src/ --format html --output psap-report.html
+```
+
+グラフの点へマウスを重ねると指標を確認でき、選択するとその名前空間コンポーネントに含まれるクラスを一覧できます。検索、ゾーン、最小Dによる絞り込みにも対応しています。
+
 ### 4 生成AIへ渡す
 
 Codexなど、解析対象のコードを読める生成AIに次のように依頼します。

@@ -110,6 +110,19 @@ final class AnalyzeCommandTest extends TestCase
         self::assertStringContainsString('"Fixture\\App\\Domain (D=', $display);
     }
 
+    public function testHtmlFormatRendersInteractiveGraph(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'html']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $tester->getDisplay();
+        self::assertStringStartsWith('<!doctype html>', $display);
+        self::assertStringContainsString('id="ia-chart"', $display);
+        self::assertStringContainsString('Fixture\\\\App\\\\Domain', $display);
+    }
+
     public function testPlantUmlFormatRendersDependencyGraph(): void
     {
         $tester = $this->commandTester();
