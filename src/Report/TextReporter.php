@@ -37,6 +37,22 @@ final class TextReporter implements ReporterInterface
         if ($data->namespaceDepth !== null) {
             $lines[] = sprintf('Namespace depth: %d', $data->namespaceDepth);
         }
+        if ($data->analysisCoverage !== null) {
+            $ratio = $data->analysisCoverage->ratio();
+            $lines[] = sprintf(
+                'Analysis coverage: %s (%s/%s selected files)',
+                $ratio === null ? 'N/A' : sprintf('%.2f%%', $ratio * 100),
+                number_format($data->analysisCoverage->analyzed),
+                number_format($data->analysisCoverage->selected),
+            );
+            $lines[] = sprintf(
+                'Files: discovered=%s, analyzed=%s, excluded=%s, skipped=%s',
+                number_format($data->analysisCoverage->discovered),
+                number_format($data->analysisCoverage->analyzed),
+                number_format($data->analysisCoverage->excluded),
+                number_format($data->analysisCoverage->skipped),
+            );
+        }
         $lines[] = '';
 
         $widths = $this->calculateColumnWidths($data->componentMetrics);

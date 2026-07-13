@@ -113,6 +113,8 @@ final class DependencyAnalyzerTest extends TestCase
 
         self::assertNotEmpty($result->warnings);
         self::assertStringContainsString('Broken.php', $result->warnings[0]);
+        self::assertSame(count($files), $result->analyzedFileCount + $result->skippedFileCount);
+        self::assertSame(1, $result->skippedFileCount);
 
         // 壊れていないファイルは問題なく解析できる
         $valid = $this->findByFqcn($result->classInfos, 'Fixture\\Broken\\Valid');
@@ -139,6 +141,8 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertStringContainsString('UTF-8', $result->warnings[0]);
         self::assertStringContainsString($invalidPath . ':3', $result->warnings[0]);
         self::assertStringContainsString('--exclude', $result->warnings[0]);
+        self::assertSame(1, $result->analyzedFileCount);
+        self::assertSame(1, $result->skippedFileCount);
     }
 
     public function testNameResolutionErrorIsCollectedAsWarningAndSkipped(): void
@@ -156,6 +160,50 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertCount(0, $result->classInfos);
         self::assertCount(1, $result->warnings);
         self::assertStringContainsString('名前解決エラーのためスキップしました', $result->warnings[0]);
+        self::assertSame(0, $result->analyzedFileCount);
+        self::assertSame(1, $result->skippedFileCount);
+    }
+
+    public function testUnreadableFileIsCountedAsSkipped(): void
+    {
+        $missingPath = sys_get_temp_dir() . '/psap_missing_' . bin2hex(random_bytes(8)) . '.php';
+
+        $result = (new DependencyAnalyzer())->analyze([$missingPath]);
+
+        self::assertSame(0, $result->analyzedFileCount);
+        self::assertSame(1, $result->skippedFileCount);
+        self::assertCount(1, $result->warnings);
+        self::assertStringContainsString($missingPath, $result->warnings[0]);
+    }
+
+    public function testFileWithoutTypeDeclarationsIsCountedAsAnalyzed(): void
+    {
+        $result = $this->analyzeCode('<?php function helper(): void {}');
+
+        self::assertCount(0, $result->classInfos);
+        self::assertSame(1, $result->analyzedFileCount);
+        self::assertSame(0, $result->skippedFileCount);
+    }
+
+    public function testNullAstIsCountedAsAnalyzed(): void
+    {
+        $parser = $this->createMock(\PhpParser\Parser::class);
+        $parser->method('parse')->willReturn(null);
+        $path = $this->createTempFile('<?php');
+
+        $result = (new DependencyAnalyzer(parser: $parser))->analyze([$path]);
+
+        self::assertCount(0, $result->classInfos);
+        self::assertSame(1, $result->analyzedFileCount);
+        self::assertSame(0, $result->skippedFileCount);
+    }
+
+    public function testAnalysisResultFileCountsRemainOptionalForExistingCallers(): void
+    {
+        $result = new AnalysisResult(classInfos: [], warnings: []);
+
+        self::assertSame(0, $result->analyzedFileCount);
+        self::assertSame(0, $result->skippedFileCount);
     }
 
     // --- 無名クラス: 宣言はClassInfoにならず、内部の依存も外側に伝播しない ---

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psap\Report;
 
+use Psap\Analyzer\AnalysisCoverage;
 use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\CyclePathFinder;
@@ -42,6 +43,7 @@ final readonly class ReportData
         public array $sourcePaths = [],
         public bool $docblockEnabled = true,
         public array $excludePatterns = [],
+        public ?AnalysisCoverage $analysisCoverage = null,
     ) {
         $components = array_map(
             static fn (ComponentMetrics $metrics): Component => $metrics->component,

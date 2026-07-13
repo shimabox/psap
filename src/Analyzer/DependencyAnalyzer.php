@@ -65,11 +65,14 @@ final class DependencyAnalyzer
     {
         $classInfos = [];
         $warnings = [];
+        $analyzedFileCount = 0;
+        $skippedFileCount = 0;
 
         foreach ($filePaths as $filePath) {
             $code = @file_get_contents($filePath);
             if ($code === false) {
                 $warnings[] = sprintf('ファイルを読み込めませんでした: %s', $filePath);
+                ++$skippedFileCount;
 
                 continue;
             }
@@ -81,6 +84,7 @@ final class DependencyAnalyzer
                     $filePath,
                     $invalidUtf8Line,
                 );
+                ++$skippedFileCount;
 
                 continue;
             }
@@ -89,11 +93,14 @@ final class DependencyAnalyzer
                 $ast = $this->parser->parse($code);
             } catch (Error $e) {
                 $warnings[] = sprintf('パースエラーのためスキップしました: %s (%s)', $filePath, $e->getMessage());
+                ++$skippedFileCount;
 
                 continue;
             }
 
             if ($ast === null) {
+                ++$analyzedFileCount;
+
                 continue;
             }
 
@@ -108,14 +115,21 @@ final class DependencyAnalyzer
                 foreach ($this->extractClassInfos($rootCollector, $filePath) as $classInfo) {
                     $classInfos[] = $classInfo;
                 }
+                ++$analyzedFileCount;
             } catch (Error $e) {
                 $warnings[] = sprintf('名前解決エラーのためスキップしました: %s (%s)', $filePath, $e->getMessage());
+                ++$skippedFileCount;
             }
         }
 
         [$classInfos, $duplicateWarnings] = $this->mergeDuplicateDeclarations($classInfos);
 
-        return new AnalysisResult($classInfos, [...$warnings, ...$duplicateWarnings]);
+        return new AnalysisResult(
+            classInfos: $classInfos,
+            warnings: [...$warnings, ...$duplicateWarnings],
+            analyzedFileCount: $analyzedFileCount,
+            skippedFileCount: $skippedFileCount,
+        );
     }
 
     private function firstInvalidUtf8Line(string $code): ?int

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Psap\Tests\Unit\Report;
 
 use PHPUnit\Framework\TestCase;
+use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
 use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
@@ -38,6 +39,48 @@ final class TextReporterTest extends TestCase
         self::assertStringContainsString('0.20', $output);
         self::assertStringContainsString('0.75', $output);
         self::assertStringContainsString('0.05', $output);
+    }
+
+    public function testRendersAnalysisCoverageNearHeader(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            analysisCoverage: new AnalysisCoverage(10_715, 8_205, 8_204, 2_510, 1),
+        );
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('Analysis coverage: 99.99% (8,204/8,205 selected files)', $output);
+        self::assertStringContainsString(
+            'Files: discovered=10,715, analyzed=8,204, excluded=2,510, skipped=1',
+            $output,
+        );
+    }
+
+    public function testRendersAnalysisCoverageAsNotApplicableWhenNoFilesAreSelected(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            analysisCoverage: new AnalysisCoverage(5, 0, 0, 5, 0),
+        );
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('Analysis coverage: N/A (0/0 selected files)', $output);
+    }
+
+    public function testOmitsAnalysisCoverageWhenUnavailable(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), []);
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringNotContainsString('Analysis coverage:', $output);
+        self::assertStringNotContainsString('Files: discovered=', $output);
     }
 
     public function testMarksPainZoneWithWarning(): void

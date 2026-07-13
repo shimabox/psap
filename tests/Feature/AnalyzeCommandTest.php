@@ -44,6 +44,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
  *     cycleGroups: list<CycleGroup>,
  *     cycleBaselineComparison: array{hasChanges: bool, newCycles: list<list<string>>, resolvedCycles: list<list<string>>}|null,
+ *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|int|null}|null,
  *     warnings: list<string>,
  * }
  */
@@ -77,8 +78,26 @@ final class AnalyzeCommandTest extends TestCase
         self::assertArrayHasKey('summary', $decoded);
         self::assertArrayHasKey('components', $decoded);
         self::assertArrayHasKey('dependencies', $decoded);
+        self::assertArrayHasKey('fileCoverage', $decoded);
         self::assertArrayHasKey('warnings', $decoded);
         self::assertGreaterThan(0, $decoded['summary']['componentCount']);
+    }
+
+    public function testJsonFormatReportsCompleteFileCoverage(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'json']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $coverage = $this->decodeJson($tester->getDisplay())['fileCoverage'];
+        self::assertNotNull($coverage);
+        self::assertSame(12, $coverage['discovered']);
+        self::assertSame(12, $coverage['selected']);
+        self::assertSame(12, $coverage['analyzed']);
+        self::assertSame(0, $coverage['excluded']);
+        self::assertSame(0, $coverage['skipped']);
+        self::assertEquals(1.0, $coverage['analysisCoverage']);
     }
 
     public function testMarkdownFormatRendersPromptReadyReport(): void
@@ -148,6 +167,14 @@ final class AnalyzeCommandTest extends TestCase
                 } else {
                     $decoded = $this->decodeJson($report);
                     self::assertStringContainsString('Latin1.php:3', implode("\n", $decoded['warnings']));
+                    self::assertSame([
+                        'discovered' => 2,
+                        'selected' => 2,
+                        'analyzed' => 1,
+                        'excluded' => 0,
+                        'skipped' => 1,
+                        'analysisCoverage' => 0.5,
+                    ], $decoded['fileCoverage']);
                 }
                 self::assertStringContainsString('Latin1.php:3', $tester->getErrorOutput());
                 self::assertStringContainsString('UTF-8', $tester->getErrorOutput());
@@ -542,6 +569,12 @@ final class AnalyzeCommandTest extends TestCase
         ));
 
         self::assertNotContains('Fixture\\App\\Generated\\Ignored', $allFqcns);
+        self::assertNotNull($decoded['fileCoverage']);
+        self::assertSame(12, $decoded['fileCoverage']['discovered']);
+        self::assertSame(11, $decoded['fileCoverage']['selected']);
+        self::assertSame(11, $decoded['fileCoverage']['analyzed']);
+        self::assertSame(1, $decoded['fileCoverage']['excluded']);
+        self::assertSame(0, $decoded['fileCoverage']['skipped']);
     }
 
     public function testVerboseFlagShowsAllComponentClassLists(): void

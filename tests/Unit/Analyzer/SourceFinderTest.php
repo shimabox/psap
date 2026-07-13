@@ -6,6 +6,7 @@ namespace Psap\Tests\Unit\Analyzer;
 
 use PHPUnit\Framework\TestCase;
 use Psap\Analyzer\SourceFinder;
+use Psap\Analyzer\SourceInventory;
 use RuntimeException;
 
 // SourceFinder: 指定ディレクトリからの .php 再帰列挙・exclude パターン・ソート順のテスト
@@ -52,6 +53,66 @@ final class SourceFinderTest extends TestCase
 
         self::assertNotContains('Generated/Ignored.php', $relativePaths);
         self::assertContains('Domain/User.php', $relativePaths);
+    }
+
+    public function testDiscoverCountsFilesBeforeAndAfterExclusion(): void
+    {
+        $inventory = (new SourceFinder())->discover(
+            [self::SIMPLE_PROJECT],
+            ['Generated/*'],
+        );
+
+        self::assertSame(12, $inventory->discoveredFileCount);
+        self::assertSame(1, $inventory->excludedFileCount);
+        self::assertSame(11, $inventory->selectedFileCount);
+        self::assertCount(11, $inventory->selectedFiles);
+        self::assertNotContains(
+            (string) realpath(self::SIMPLE_PROJECT . '/Generated/Ignored.php'),
+            $inventory->selectedFiles,
+        );
+    }
+
+    public function testDiscoverDeduplicatesOverlappingRootsByRealPath(): void
+    {
+        $inventory = (new SourceFinder())->discover([
+            self::SIMPLE_PROJECT,
+            self::SIMPLE_PROJECT . '/Domain',
+        ]);
+
+        self::assertSame(12, $inventory->discoveredFileCount);
+        self::assertSame(0, $inventory->excludedFileCount);
+        self::assertSame(12, $inventory->selectedFileCount);
+        self::assertCount(12, $inventory->selectedFiles);
+    }
+
+    public function testDiscoverPrefersSelectedWhenOverlappingRootsDisagreeOnExclusion(): void
+    {
+        $inventory = (new SourceFinder())->discover(
+            [
+                self::SIMPLE_PROJECT . '/Generated',
+                self::SIMPLE_PROJECT,
+            ],
+            ['Generated/*'],
+        );
+
+        self::assertSame(12, $inventory->discoveredFileCount);
+        self::assertSame(0, $inventory->excludedFileCount);
+        self::assertSame(12, $inventory->selectedFileCount);
+        self::assertContains(
+            (string) realpath(self::SIMPLE_PROJECT . '/Generated/Ignored.php'),
+            $inventory->selectedFiles,
+        );
+    }
+
+    public function testSourceInventoryRejectsInconsistentCounts(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new SourceInventory(
+            selectedFiles: [],
+            discoveredFileCount: 1,
+            excludedFileCount: 0,
+        );
     }
 
     public function testExcludesNestedDirectoryUsingWildcardPattern(): void

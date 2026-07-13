@@ -204,6 +204,71 @@ final class HtmlReporter implements ReporterInterface
       cursor: pointer;
     }
 
+    .coverage-panel {
+      margin: 0 0 18px;
+      border: 1px solid var(--grid);
+      border-top: 4px solid var(--main);
+      background: var(--paper);
+      box-shadow: 0 10px 28px rgb(24 37 47 / 7%);
+    }
+    .coverage-panel[hidden] { display: none; }
+    .coverage-panel.has-skips { border-top-color: var(--pain); }
+    .coverage-lead {
+      display: grid;
+      grid-template-columns: minmax(110px, .3fr) minmax(240px, 1fr);
+      gap: 18px;
+      align-items: end;
+      padding: 16px;
+    }
+    .coverage-ratio {
+      margin: 0;
+      color: var(--main);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: clamp(1.55rem, 3vw, 2.15rem);
+      font-weight: 700;
+      line-height: 1;
+    }
+    .coverage-panel.has-skips .coverage-ratio { color: var(--pain); }
+    .coverage-copy h2 { margin: 0; font-size: .9rem; }
+    .coverage-copy p { margin: 3px 0 0; color: var(--muted); font-size: .8rem; }
+    .coverage-meter {
+      display: block;
+      width: calc(100% - 32px);
+      height: 5px;
+      margin: 0 16px 14px;
+      border: 0;
+      background: var(--grid);
+      accent-color: var(--main);
+    }
+    .coverage-panel.has-skips .coverage-meter { accent-color: var(--pain); }
+    .coverage-meter::-webkit-progress-bar { background: var(--grid); }
+    .coverage-meter::-webkit-progress-value { background: var(--main); }
+    .coverage-panel.has-skips .coverage-meter::-webkit-progress-value { background: var(--pain); }
+    .coverage-meter::-moz-progress-bar { background: var(--main); }
+    .coverage-panel.has-skips .coverage-meter::-moz-progress-bar { background: var(--pain); }
+    .coverage-ledger {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      margin: 0;
+      border-top: 1px solid var(--grid);
+    }
+    .coverage-ledger div { padding: 10px 16px; }
+    .coverage-ledger div + div { border-left: 1px solid var(--grid); }
+    .coverage-ledger dt {
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .63rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .coverage-ledger dd {
+      margin: 2px 0 0;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .9rem;
+      font-weight: 700;
+    }
+    .coverage-limit { margin: 0; padding: 10px 16px; border-top: 1px solid var(--grid); color: var(--muted); font-size: .7rem; }
+
     .warning-panel {
       margin: 0 0 18px;
       border: 1px solid rgb(181 75 53 / 45%);
@@ -540,6 +605,9 @@ final class HtmlReporter implements ReporterInterface
       .masthead, .workspace { grid-template-columns: 1fr; }
       .masthead-side { justify-items: stretch; }
       .summary { width: 100%; }
+      .coverage-ledger { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .coverage-ledger div:nth-child(4) { border-top: 1px solid var(--grid); border-left: 0; }
+      .coverage-ledger div:nth-child(5) { border-top: 1px solid var(--grid); }
       .toolbar { grid-template-columns: 1fr 1fr; }
       .inspector { border-top: 1px solid var(--grid); border-left: 0; }
     }
@@ -551,6 +619,11 @@ final class HtmlReporter implements ReporterInterface
       .summary div { padding: 10px; }
       .summary div:nth-child(3) { border-top: 1px solid var(--grid); border-left: 0; }
       .summary div:nth-child(4) { border-top: 1px solid var(--grid); }
+      .coverage-lead { grid-template-columns: 1fr; gap: 8px; }
+      .coverage-ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .coverage-ledger div:nth-child(n) { border-top: 1px solid var(--grid); border-left: 0; }
+      .coverage-ledger div:nth-child(even) { border-left: 1px solid var(--grid); }
+      .coverage-ledger div:nth-child(-n + 2) { border-top: 0; }
       .plot-panel { padding: 8px; }
       #ia-chart { min-height: 340px; }
     }
@@ -588,6 +661,25 @@ final class HtmlReporter implements ReporterInterface
         </dl>
       </div>
     </header>
+
+    <section id="coverage-panel" class="coverage-panel" aria-labelledby="coverage-heading" hidden>
+      <div class="coverage-lead">
+        <p id="coverage-ratio" class="coverage-ratio">—</p>
+        <div class="coverage-copy">
+          <h2 id="coverage-heading" data-i18n="analysisCoverage">Analysis coverage</h2>
+          <p id="coverage-description">—</p>
+        </div>
+      </div>
+      <progress id="coverage-meter" class="coverage-meter" max="1" value="0"></progress>
+      <dl class="coverage-ledger">
+        <div><dt data-i18n="discoveredFiles">Discovered</dt><dd id="coverage-discovered">—</dd></div>
+        <div><dt data-i18n="selectedFiles">Selected</dt><dd id="coverage-selected">—</dd></div>
+        <div><dt data-i18n="analyzedFiles">Analyzed</dt><dd id="coverage-analyzed">—</dd></div>
+        <div><dt data-i18n="excludedFiles">Excluded</dt><dd id="coverage-excluded">—</dd></div>
+        <div><dt data-i18n="skippedFiles">Skipped</dt><dd id="coverage-skipped">—</dd></div>
+      </dl>
+      <p class="coverage-limit" data-i18n="coverageLimit">File coverage does not include dynamic or configuration-only dependencies.</p>
+    </section>
 
     <section id="warning-panel" class="warning-panel" aria-labelledby="warning-heading" hidden>
       <header class="warning-header"><h2 id="warning-heading" data-i18n="analysisWarnings">Analysis warnings</h2><span id="warning-count" class="warning-count">0</span></header>
@@ -709,6 +801,15 @@ final class HtmlReporter implements ReporterInterface
           description: 'Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.',
           language: 'Language',
           analysisSummary: 'Analysis summary',
+          analysisCoverage: 'Analysis coverage',
+          coverageDescription: '{analyzed} of {selected} selected PHP files analyzed.',
+          coverageMeterLabel: 'Analysis coverage: {ratio}',
+          coverageLimit: 'File coverage does not include dynamic or configuration-only dependencies.',
+          discoveredFiles: 'Discovered',
+          selectedFiles: 'Selected',
+          analyzedFiles: 'Analyzed',
+          excludedFiles: 'Excluded',
+          skippedFiles: 'Skipped',
           analysisWarnings: 'Analysis warnings',
           warningIntro: 'Some files could not be analyzed. Review these messages before relying on this report.',
           components: 'Components',
@@ -793,6 +894,15 @@ final class HtmlReporter implements ReporterInterface
           description: '各点は名前空間コンポーネントを表します。マウスを重ねるとSAP指標を、選択するとその点に含まれるクラスを確認できます。',
           language: '表示言語',
           analysisSummary: '解析概要',
+          analysisCoverage: '解析カバレッジ',
+          coverageDescription: '選択したPHPファイル{selected}件中{analyzed}件を解析しました。',
+          coverageMeterLabel: '解析カバレッジ: {ratio}',
+          coverageLimit: 'ファイルカバレッジには、動的参照や設定ファイルだけに書かれた依存は含まれません。',
+          discoveredFiles: '発見',
+          selectedFiles: '選択',
+          analyzedFiles: '解析済み',
+          excludedFiles: '除外',
+          skippedFiles: 'スキップ',
           analysisWarnings: '解析時の警告',
           warningIntro: '解析できなかったファイルがあります。このレポートを判断に使う前に、次のメッセージを確認してください。',
           components: 'コンポーネント',
@@ -886,6 +996,10 @@ final class HtmlReporter implements ReporterInterface
       const distanceOutput = document.getElementById('distance-output');
       const resultCount = document.getElementById('result-count');
       const language = document.getElementById('language');
+      const coveragePanel = document.getElementById('coverage-panel');
+      const coverageRatio = document.getElementById('coverage-ratio');
+      const coverageDescription = document.getElementById('coverage-description');
+      const coverageMeter = document.getElementById('coverage-meter');
       const warningPanel = document.getElementById('warning-panel');
       const warningCount = document.getElementById('warning-count');
       const warningList = document.getElementById('warning-list');
@@ -920,10 +1034,32 @@ final class HtmlReporter implements ReporterInterface
         document.querySelectorAll('[data-i18n-aria-label]').forEach((element) => {
           element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
         });
+        renderCoverage();
         renderWarnings();
         update();
         renderCycles();
         if (selected) renderInspector(selected, selectedGroup);
+      }
+
+      function renderCoverage() {
+        const coverage = report.fileCoverage;
+        coveragePanel.hidden = coverage === null;
+        if (coverage === null) return;
+
+        const ratio = coverage.analysisCoverage;
+        const ratioLabel = ratio === null ? 'N/A' : `${(ratio * 100).toFixed(2)}%`;
+        const formattedCoverage = Object.fromEntries(
+          ['discovered', 'selected', 'analyzed', 'excluded', 'skipped']
+            .map((key) => [key, Number(coverage[key]).toLocaleString(locale)]),
+        );
+        coveragePanel.classList.toggle('has-skips', coverage.skipped > 0);
+        coverageRatio.textContent = ratioLabel;
+        coverageDescription.textContent = t('coverageDescription', formattedCoverage);
+        coverageMeter.value = ratio === null ? 0 : ratio;
+        coverageMeter.setAttribute('aria-label', t('coverageMeterLabel', { ratio: ratioLabel }));
+        ['discovered', 'selected', 'analyzed', 'excluded', 'skipped'].forEach((key) => {
+          document.getElementById(`coverage-${key}`).textContent = formattedCoverage[key];
+        });
       }
 
       function renderWarnings() {
@@ -1358,6 +1494,7 @@ HTML);
     /**
      * @return array{
      *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
+     *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|null}|null,
      *     warnings: list<string>,
      *     components: list<array{
      *         name: string,
@@ -1391,11 +1528,23 @@ HTML);
      */
     private function payload(ReportData $data): array
     {
+        $coverageRatio = $data->analysisCoverage?->ratio();
+
         return [
             'summary' => [
                 'componentCount' => count($data->componentMetrics),
                 'meanDistance' => $data->summary->meanDistance === null ? null : round($data->summary->meanDistance, 4),
                 'cycleGroupCount' => count($data->cycles),
+            ],
+            'fileCoverage' => $data->analysisCoverage === null ? null : [
+                'discovered' => $data->analysisCoverage->discovered,
+                'selected' => $data->analysisCoverage->selected,
+                'analyzed' => $data->analysisCoverage->analyzed,
+                'excluded' => $data->analysisCoverage->excluded,
+                'skipped' => $data->analysisCoverage->skipped,
+                'analysisCoverage' => $coverageRatio === null
+                    ? null
+                    : round($coverageRatio, 4),
             ],
             'warnings' => $data->warnings,
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),

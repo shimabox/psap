@@ -7,7 +7,8 @@ namespace Psap\Analyzer;
 /**
  * DependencyAnalyzer::analyze() の結果。
  *
- * 正常に解析できた ClassInfo 一覧と、パースエラー等で発生した警告メッセージ一覧を持つ。
+ * 正常に解析できた ClassInfo 一覧、パースエラー等で発生した警告メッセージ一覧、
+ * および解析成功・スキップしたファイル数を持つ。
  */
 final readonly class AnalysisResult
 {
@@ -18,6 +19,8 @@ final readonly class AnalysisResult
     public function __construct(
         public array $classInfos,
         public array $warnings,
+        public int $analyzedFileCount = 0,
+        public int $skippedFileCount = 0,
     ) {
     }
 }
