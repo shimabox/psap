@@ -11,6 +11,10 @@ use Psap\Analyzer\ClassInfo;
 use Psap\Analyzer\TypeKind;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticCode;
+use Psap\Diagnostic\DiagnosticSeverity;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
 use Psap\Metrics\Zone;
@@ -50,6 +54,7 @@ use Psap\Report\ReportData;
  *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
  *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|int|null}|null,
  *     warnings: list<string>,
+ *     diagnostics: list<array{code: string, severity: string, file: string|null, line: int|null, context: array<string, bool|float|int|string|null>, actions: list<string>}>,
  *     components: list<HtmlComponent>,
  *     cycles: list<HtmlCycle>
  * }
@@ -93,7 +98,8 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString("containedClasses: '含まれるクラス'", $output);
         self::assertStringContainsString("cycleHeading: '循環依存が検出されました'", $output);
         self::assertStringContainsString("analysisCoverage: '解析カバレッジ'", $output);
-        self::assertStringContainsString("analysisWarnings: '解析時の警告'", $output);
+        self::assertStringContainsString("analysisDiagnostics: '解析上の注意'", $output);
+        self::assertStringContainsString("diagnosticAction: '推奨する次の対応'", $output);
         self::assertStringContainsString("noMatches: '絞り込みに一致するコンポーネントがありません。", $output);
         self::assertStringContainsString("metricIName: 'Instability (I)'", $output);
         self::assertStringContainsString("metricIHelp: 'Ce / (Ca + Ce).", $output);
@@ -160,10 +166,73 @@ final class HtmlReporterTest extends TestCase
         $payload = $this->payload($output);
 
         self::assertSame([$warning], $payload['warnings']);
+        self::assertSame([], $payload['diagnostics']);
         self::assertStringContainsString('id="warning-count"', $output);
+        self::assertStringContainsString('id="diagnostic-list"', $output);
         self::assertStringContainsString('id="warning-list"', $output);
-        self::assertStringContainsString('warningPanel.hidden = report.warnings.length === 0', $output);
-        self::assertStringContainsString("appendTextElement(warningList, 'li', warning)", $output);
+        self::assertStringContainsString('function renderDiagnostics()', $output);
+        self::assertStringContainsString('warningPanel.hidden = diagnostics.length === 0 && warnings.length === 0', $output);
+        self::assertStringContainsString("warnings.forEach((warning) => appendTextElement(warningList, 'li', warning))", $output);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testEmbedsLanguageNeutralDiagnosticsAndRendersAuditRows(): void
+    {
+        $metrics = [$this->metrics('App\\Domain', 0.2, 0.75, 0.05)];
+        $diagnostic = new Diagnostic(
+            code: DiagnosticCode::SourceInvalidUtf8,
+            severity: DiagnosticSeverity::Warning,
+            file: 'Component/Cache/ValueWrapper.php',
+            line: 19,
+            context: ['encoding' => 'ISO-8859-1'],
+            actions: [DiagnosticAction::ConvertToUtf8, DiagnosticAction::ExcludeFile],
+        );
+        $data = new ReportData(
+            $metrics,
+            MetricsSummary::from($metrics),
+            [],
+            diagnostics: [$diagnostic],
+        );
+
+        $output = (new HtmlReporter())->render($data);
+        $payload = $this->payload($output);
+
+        self::assertSame([[
+            'code' => 'source.invalid_utf8',
+            'severity' => 'warning',
+            'file' => 'Component/Cache/ValueWrapper.php',
+            'line' => 19,
+            'context' => ['encoding' => 'ISO-8859-1'],
+            'actions' => ['convert_to_utf8', 'exclude_file'],
+        ]], $payload['diagnostics']);
+        self::assertStringContainsString("'source.invalid_utf8': 'diagnosticSourceInvalidUtf8'", $output);
+        self::assertStringContainsString("diagnosticSourceInvalidUtf8: 'UTF-8として解釈できないためスキップしました。'", $output);
+        self::assertStringContainsString("actionConvertToUtf8: 'ファイルをUTF-8へ変換してください。'", $output);
+        self::assertStringContainsString('const location = diagnostic.line === null ? diagnostic.file : `${diagnostic.file}:${diagnostic.line}`', $output);
+        self::assertStringContainsString("messageKey ? t(messageKey, diagnostic.context || {}) : t('diagnosticUnknown'", $output);
+        self::assertStringContainsString('.diagnostic-item {', $output);
+        self::assertStringNotContainsString('cursor: help', $output);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testProvidesSafeDisplayMappingsForEveryDiagnosticCodeAndAction(): void
+    {
+        $metrics = [$this->metrics('App\\Domain', 0.2, 0.75, 0.05)];
+        $output = (new HtmlReporter())->render(new ReportData($metrics, MetricsSummary::from($metrics), []));
+
+        foreach (DiagnosticCode::cases() as $code) {
+            self::assertStringContainsString("'{$code->value}': 'diagnostic", $output);
+        }
+        foreach (DiagnosticAction::cases() as $action) {
+            self::assertStringContainsString("{$action->value}: 'action", $output);
+        }
+
+        self::assertStringContainsString("diagnosticUnknown: 'The analyzer reported an unrecognized diagnostic: {code}.'", $output);
+        self::assertStringContainsString("const display = typeof value === 'string' ? value : JSON.stringify(value)", $output);
     }
 
     /**

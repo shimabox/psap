@@ -11,6 +11,10 @@ use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticCode;
+use Psap\Diagnostic\DiagnosticSeverity;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
 use Psap\Metrics\Zone;
@@ -51,6 +55,15 @@ use Psap\Report\ReportData;
  *     cycleGroups: list<CycleGroup>,
  *     cycleBaselineComparison: array{hasChanges: bool, newCycles: list<list<string>>, resolvedCycles: list<list<string>>}|null,
  *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|int|null}|null,
+ *     diagnostics: list<array{
+ *         code: string,
+ *         severity: string,
+ *         file: string|null,
+ *         line: int|null,
+ *         message: string,
+ *         context: array<string, bool|float|int|string|null>,
+ *         actions: list<array{code: string, option?: string}>,
+ *     }>,
  *     warnings: list<string>,
  * }
  */
@@ -247,6 +260,39 @@ final class JsonReporterTest extends TestCase
         $decoded = $this->decode((new JsonReporter())->render($data));
 
         self::assertSame(['パースエラーのためスキップしました: /x.php'], $decoded['warnings']);
+        self::assertSame([], $decoded['diagnostics']);
+    }
+
+    public function testEncodesStructuredDiagnosticsAndCompatibilityWarnings(): void
+    {
+        $diagnostic = new Diagnostic(
+            code: DiagnosticCode::SourceInvalidUtf8,
+            severity: DiagnosticSeverity::Warning,
+            file: 'Component/Cache/ValueWrapper.php',
+            line: 19,
+            context: ['encoding' => 'Latin-1'],
+            actions: [DiagnosticAction::ConvertToUtf8, DiagnosticAction::ExcludeFile],
+        );
+        $data = new ReportData([], MetricsSummary::from([]), [], diagnostics: [$diagnostic]);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertSame([
+            'code' => 'source.invalid_utf8',
+            'severity' => 'warning',
+            'file' => 'Component/Cache/ValueWrapper.php',
+            'line' => 19,
+            'message' => 'Source file is not valid UTF-8 and was skipped.',
+            'context' => ['encoding' => 'Latin-1'],
+            'actions' => [
+                ['code' => 'convert_to_utf8'],
+                ['code' => 'exclude_file', 'option' => '--exclude'],
+            ],
+        ], $decoded['diagnostics'][0]);
+        self::assertCount(1, $decoded['warnings']);
+        self::assertStringContainsString('UTF-8として解釈できない', $decoded['warnings'][0]);
+        self::assertStringContainsString('Component/Cache/ValueWrapper.php:19', $decoded['warnings'][0]);
+        self::assertStringContainsString('--exclude', $decoded['warnings'][0]);
     }
 
     public function testEncodesFileCoverage(): void

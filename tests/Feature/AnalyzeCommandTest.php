@@ -45,6 +45,15 @@ use Symfony\Component\Console\Tester\CommandTester;
  *     cycleGroups: list<CycleGroup>,
  *     cycleBaselineComparison: array{hasChanges: bool, newCycles: list<list<string>>, resolvedCycles: list<list<string>>}|null,
  *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|int|null}|null,
+ *     diagnostics: list<array{
+ *         code: string,
+ *         severity: string,
+ *         file: string|null,
+ *         line: int|null,
+ *         message: string,
+ *         context: array<string, bool|float|int|string|null>,
+ *         actions: list<array{code: string, option?: string}>,
+ *     }>,
  *     warnings: list<string>,
  * }
  */
@@ -79,6 +88,7 @@ final class AnalyzeCommandTest extends TestCase
         self::assertArrayHasKey('components', $decoded);
         self::assertArrayHasKey('dependencies', $decoded);
         self::assertArrayHasKey('fileCoverage', $decoded);
+        self::assertArrayHasKey('diagnostics', $decoded);
         self::assertArrayHasKey('warnings', $decoded);
         self::assertGreaterThan(0, $decoded['summary']['componentCount']);
     }
@@ -163,10 +173,17 @@ final class AnalyzeCommandTest extends TestCase
                 $report = (string) file_get_contents($outputPath);
                 if ($format === 'html') {
                     self::assertStringStartsWith('<!doctype html>', $report);
-                    self::assertStringContainsString('Latin1.php:3', $report);
+                    self::assertStringContainsString('source.invalid_utf8', $report);
+                    self::assertStringContainsString('Latin1.php', $report);
                 } else {
                     $decoded = $this->decodeJson($report);
                     self::assertStringContainsString('Latin1.php:3', implode("\n", $decoded['warnings']));
+                    self::assertSame('source.invalid_utf8', $decoded['diagnostics'][0]['code']);
+                    self::assertSame('warning', $decoded['diagnostics'][0]['severity']);
+                    self::assertSame('Latin1.php', $decoded['diagnostics'][0]['file']);
+                    self::assertSame(3, $decoded['diagnostics'][0]['line']);
+                    self::assertContains(['code' => 'exclude_file', 'option' => '--exclude'], $decoded['diagnostics'][0]['actions']);
+                    self::assertStringContainsString('"context": {}', $report);
                     self::assertSame([
                         'discovered' => 2,
                         'selected' => 2,
@@ -176,6 +193,7 @@ final class AnalyzeCommandTest extends TestCase
                         'analysisCoverage' => 0.5,
                     ], $decoded['fileCoverage']);
                 }
+                self::assertStringContainsString('source.invalid_utf8', $tester->getErrorOutput());
                 self::assertStringContainsString('Latin1.php:3', $tester->getErrorOutput());
                 self::assertStringContainsString('UTF-8', $tester->getErrorOutput());
                 self::assertStringContainsString('--exclude', $tester->getErrorOutput());
@@ -475,6 +493,8 @@ final class AnalyzeCommandTest extends TestCase
         $decoded = $this->decodeJson($tester->getDisplay());
 
         self::assertCount(1, $decoded['components']);
+        self::assertSame('analysis.single_component_depth', $decoded['diagnostics'][0]['code']);
+        self::assertSame('info', $decoded['diagnostics'][0]['severity']);
         self::assertStringContainsString('--depth を増やしてください', $decoded['warnings'][0]);
     }
 
@@ -486,6 +506,8 @@ final class AnalyzeCommandTest extends TestCase
         $decoded = $this->decodeJson($tester->getDisplay());
 
         self::assertCount(1, $decoded['components']);
+        self::assertSame('analysis.single_component_unevaluable', $decoded['diagnostics'][1]['code']);
+        self::assertSame('info', $decoded['diagnostics'][1]['severity']);
         self::assertStringContainsString(
             'コンポーネント間のCa、Ce、I、D、循環依存は評価できません',
             implode("\n", $decoded['warnings']),
@@ -504,6 +526,8 @@ final class AnalyzeCommandTest extends TestCase
         $decoded = $this->decodeJson($tester->getDisplay());
 
         self::assertSame(0, $decoded['summary']['componentCount']);
+        self::assertSame('analysis.no_types', $decoded['diagnostics'][0]['code']);
+        self::assertSame('warning', $decoded['diagnostics'][0]['severity']);
         self::assertFalse($decoded['summary']['metricsEvaluable']);
         self::assertNull($decoded['summary']['meanDistance']);
         self::assertStringContainsString('解析可能なクラス', implode("\n", $decoded['warnings']));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psap\Report;
 
+use Psap\Diagnostic\DiagnosticFormatter;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\Zone;
 
@@ -26,6 +27,7 @@ final class MarkdownReporter implements ReporterInterface
             ...$this->cycles($data),
             ...$this->dependencyHotspots($data),
             ...$this->metrics($data),
+            ...$this->diagnostics($data),
             ...$this->warnings($data),
             ...$this->interpretationNotes(),
         ]);
@@ -330,6 +332,28 @@ final class MarkdownReporter implements ReporterInterface
             ...array_map(static fn (string $warning): string => '- ' . $warning, $data->warnings),
             '',
         ];
+    }
+
+    /** @return list<string> */
+    private function diagnostics(ReportData $data): array
+    {
+        if ($data->diagnostics === []) {
+            return [];
+        }
+
+        $formatter = new DiagnosticFormatter('en');
+        $lines = ['## Diagnostics', ''];
+        foreach ($data->diagnostics as $diagnostic) {
+            $lines[] = sprintf(
+                '- **%s** `%s`: %s',
+                ucfirst($diagnostic->severity->value),
+                $diagnostic->code->value,
+                $formatter->format($diagnostic),
+            );
+        }
+        $lines[] = '';
+
+        return $lines;
     }
 
     /** @return list<string> */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Psap\Report;
 
 use Psap\Analyzer\ClassInfo;
+use Psap\Diagnostic\DiagnosticFormatter;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\Zone;
 
@@ -150,6 +151,15 @@ final class TextReporter implements ReporterInterface
             $lines[] = sprintf('Classes in %s:', $metrics->component->name);
             foreach ($metrics->component->classInfos as $classInfo) {
                 $lines[] = $this->classLine($classInfo);
+            }
+        }
+
+        if ($data->diagnostics !== []) {
+            $lines[] = '';
+            $lines[] = 'Diagnostics:';
+            $formatter = new DiagnosticFormatter('en');
+            foreach ($data->diagnostics as $diagnostic) {
+                $lines[] = sprintf('  - [%s] %s', $diagnostic->severity->value, $formatter->format($diagnostic));
             }
         }
 

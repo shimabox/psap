@@ -11,6 +11,10 @@ use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticCode;
+use Psap\Diagnostic\DiagnosticSeverity;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
 use Psap\Metrics\Zone;
@@ -291,6 +295,26 @@ final class TextReporterTest extends TestCase
         $output = (new TextReporter())->render($data);
 
         self::assertStringContainsString('パースエラーのためスキップしました: /path/to/Broken.php', $output);
+    }
+
+    public function testRendersStructuredDiagnosticsInEnglish(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            diagnostics: [new Diagnostic(
+                code: DiagnosticCode::AnalysisSingleComponentDepth,
+                severity: DiagnosticSeverity::Info,
+                actions: [DiagnosticAction::IncreaseDepth],
+            )],
+        );
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('Diagnostics:', $output);
+        self::assertStringContainsString('[info] All types were grouped into one component', $output);
+        self::assertStringContainsString('Increase --depth', $output);
     }
 
     public function testRendersCycleBaselineComparison(): void

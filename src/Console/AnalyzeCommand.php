@@ -13,6 +13,11 @@ use Psap\Component\ComponentClassifier;
 use Psap\Component\ComponentDepthResolver;
 use Psap\Component\CycleDetector;
 use Psap\Component\DependencyGraph;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticCode;
+use Psap\Diagnostic\DiagnosticFormatter;
+use Psap\Diagnostic\DiagnosticSeverity;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsCalculator;
 use Psap\Metrics\MetricsSummary;
@@ -219,11 +224,6 @@ final class AnalyzeCommand extends Command
             excluded: $sourceInventory->excludedFileCount,
             skipped: $analysisResult->skippedFileCount,
         );
-        if ($output instanceof ConsoleOutputInterface) {
-            foreach ($analysisResult->warnings as $warning) {
-                $errorOutput->writeln(sprintf('<comment>Warning: %s</comment>', $warning));
-            }
-        }
         $depth ??= (new ComponentDepthResolver())->resolve($analysisResult->classInfos);
         $components = (new ComponentClassifier())->classify($analysisResult->classInfos, $depth);
         $componentMetrics = (new MetricsCalculator())->calculate($components);
@@ -252,19 +252,42 @@ final class AnalyzeCommand extends Command
             }
         }
 
-        $warnings = $analysisResult->warnings;
+        $diagnostics = $analysisResult->diagnostics;
         if ($components === []) {
-            $warnings[] = '解析可能なクラス、インターフェース、トレイト、enumが見つかりませんでした。';
+            $diagnostics[] = new Diagnostic(
+                code: DiagnosticCode::AnalysisNoTypes,
+                severity: DiagnosticSeverity::Warning,
+                actions: [DiagnosticAction::ReviewSourcePaths],
+            );
         } elseif (count($components) === 1) {
-            $warnings[] = $this->hasDeeperNamespaces($analysisResult->classInfos, $components[0]->name)
-                ? 'コンポーネントが1件のみです。より細かく分析する場合は --depth を増やしてください。'
-                : 'コンポーネントが1件のみのため、コンポーネント間のCa、Ce、I、D、循環依存は評価できません。';
+            $hasDeeperNamespaces = $this->hasDeeperNamespaces($analysisResult->classInfos, $components[0]->name);
+            $diagnostics[] = new Diagnostic(
+                code: $hasDeeperNamespaces
+                    ? DiagnosticCode::AnalysisSingleComponentDepth
+                    : DiagnosticCode::AnalysisSingleComponentUnevaluable,
+                severity: DiagnosticSeverity::Info,
+                actions: [$hasDeeperNamespaces
+                    ? DiagnosticAction::IncreaseDepth
+                    : DiagnosticAction::ReviewComponentBoundary],
+            );
+        }
+
+        if ($output instanceof ConsoleOutputInterface) {
+            $formatter = new DiagnosticFormatter('ja');
+            foreach ($diagnostics as $diagnostic) {
+                $errorOutput->writeln(sprintf(
+                    '<comment>%s [%s]: %s</comment>',
+                    ucfirst($diagnostic->severity->value),
+                    $diagnostic->code->value,
+                    $formatter->format($diagnostic),
+                ));
+            }
         }
 
         $reportData = new ReportData(
             $componentMetrics,
             $summary,
-            $warnings,
+            [],
             $cycles,
             $dependencyGraph,
             $depth,
@@ -273,6 +296,7 @@ final class AnalyzeCommand extends Command
             !$noDocblock,
             $excludePatterns,
             $analysisCoverage,
+            $diagnostics,
         );
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);

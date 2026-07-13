@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Psap\Report;
 
 use JsonException;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\Zone;
 
@@ -271,11 +273,12 @@ final class HtmlReporter implements ReporterInterface
 
     .warning-panel {
       margin: 0 0 18px;
-      border: 1px solid rgb(181 75 53 / 45%);
-      border-left: 5px solid var(--pain);
-      background: rgb(181 75 53 / 7%);
+      border: 1px solid var(--grid);
+      border-top: 4px solid var(--main);
+      background: var(--paper);
       box-shadow: 0 10px 28px rgb(24 37 47 / 7%);
     }
+    .warning-panel.has-warning { border-color: rgb(181 75 53 / 45%); border-top-color: var(--pain); }
     .warning-panel[hidden] { display: none; }
     .warning-header {
       display: flex;
@@ -287,23 +290,75 @@ final class HtmlReporter implements ReporterInterface
     .warning-header h2 { margin: 0; font-size: .9rem; }
     .warning-count {
       min-width: 2.2em;
-      background: var(--pain);
+      background: var(--main);
       color: white;
       padding: 2px 8px;
       text-align: center;
       font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
       font-size: .74rem;
     }
-    .warning-body { border-top: 1px solid rgb(181 75 53 / 28%); padding: 13px 16px 15px; }
-    .warning-body p { margin: 0 0 10px; color: var(--muted); font-size: .82rem; }
+    .warning-panel.has-warning .warning-count { background: var(--pain); }
+    .warning-body { border-top: 1px solid var(--grid); }
+    .warning-panel.has-warning .warning-body { border-top-color: rgb(181 75 53 / 28%); }
+    .diagnostic-list { border-top: 1px solid var(--grid); }
+    .diagnostic-item {
+      display: grid;
+      grid-template-columns: minmax(250px, 1.15fr) minmax(220px, .9fr) minmax(260px, 1fr);
+      min-width: 0;
+    }
+    .diagnostic-item + .diagnostic-item { border-top: 1px solid var(--grid); }
+    .diagnostic-cell { min-width: 0; padding: 14px 16px 16px; }
+    .diagnostic-cell + .diagnostic-cell { border-left: 1px solid var(--grid); }
+    .diagnostic-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .diagnostic-severity, .diagnostic-code {
+      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .63rem;
+      letter-spacing: .04em;
+    }
+    .diagnostic-severity {
+      background: var(--pain);
+      color: white;
+      padding: 2px 7px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .diagnostic-severity.is-info { background: var(--main); }
+    .diagnostic-severity.is-error { background: var(--ink); }
+    .diagnostic-code { color: var(--muted); overflow-wrap: anywhere; }
+    .diagnostic-reason { margin: 0; font-size: .86rem; line-height: 1.45; }
+    .diagnostic-label {
+      display: block;
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .63rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .diagnostic-location {
+      display: block;
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .76rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .diagnostic-context { margin: 8px 0 0; color: var(--muted); font-size: .72rem; overflow-wrap: anywhere; }
+    .diagnostic-actions { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+    .diagnostic-actions li { color: var(--ink); font-size: .76rem; line-height: 1.4; }
+    .diagnostic-actions span, .diagnostic-actions code { display: block; }
+    .diagnostic-actions code { margin-top: 1px; color: var(--muted); font-size: .65rem; }
     .warning-list {
       max-height: 180px;
       margin: 0;
-      padding-left: 22px;
+      padding: 12px 16px 14px 38px;
       overflow: auto;
       font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
       font-size: .76rem;
     }
+    .warning-list[hidden], .diagnostic-list[hidden] { display: none; }
     .warning-list li { padding: 4px 0; overflow-wrap: anywhere; }
 
     .workspace {
@@ -610,6 +665,8 @@ final class HtmlReporter implements ReporterInterface
       .coverage-ledger div:nth-child(5) { border-top: 1px solid var(--grid); }
       .toolbar { grid-template-columns: 1fr 1fr; }
       .inspector { border-top: 1px solid var(--grid); border-left: 0; }
+      .diagnostic-item { grid-template-columns: minmax(230px, 1fr) minmax(220px, 1fr); }
+      .diagnostic-cell:last-child { grid-column: 1 / -1; border-top: 1px solid var(--grid); border-left: 0; }
     }
 
     @media (max-width: 580px) {
@@ -624,6 +681,9 @@ final class HtmlReporter implements ReporterInterface
       .coverage-ledger div:nth-child(n) { border-top: 1px solid var(--grid); border-left: 0; }
       .coverage-ledger div:nth-child(even) { border-left: 1px solid var(--grid); }
       .coverage-ledger div:nth-child(-n + 2) { border-top: 0; }
+      .diagnostic-item { grid-template-columns: 1fr; }
+      .diagnostic-cell + .diagnostic-cell { border-top: 1px solid var(--grid); border-left: 0; }
+      .diagnostic-cell:last-child { grid-column: auto; }
       .plot-panel { padding: 8px; }
       #ia-chart { min-height: 340px; }
     }
@@ -682,10 +742,10 @@ final class HtmlReporter implements ReporterInterface
     </section>
 
     <section id="warning-panel" class="warning-panel" aria-labelledby="warning-heading" hidden>
-      <header class="warning-header"><h2 id="warning-heading" data-i18n="analysisWarnings">Analysis warnings</h2><span id="warning-count" class="warning-count">0</span></header>
+      <header class="warning-header"><h2 id="warning-heading" data-i18n="analysisDiagnostics">Analysis notices</h2><span id="warning-count" class="warning-count">0</span></header>
       <div class="warning-body">
-        <p data-i18n="warningIntro">Some files could not be analyzed. Review these messages before relying on this report.</p>
-        <ul id="warning-list" class="warning-list"></ul>
+        <div id="diagnostic-list" class="diagnostic-list"></div>
+        <ul id="warning-list" class="warning-list" hidden></ul>
       </div>
     </section>
 
@@ -810,8 +870,33 @@ final class HtmlReporter implements ReporterInterface
           analyzedFiles: 'Analyzed',
           excludedFiles: 'Excluded',
           skippedFiles: 'Skipped',
-          analysisWarnings: 'Analysis warnings',
-          warningIntro: 'Some files could not be analyzed. Review these messages before relying on this report.',
+          analysisDiagnostics: 'Analysis notices',
+          diagnosticLocation: 'Source location',
+          diagnosticAction: 'Recommended next step',
+          diagnosticDetails: 'Details',
+          diagnosticNoLocation: 'No source location was recorded.',
+          diagnosticNoAction: 'Review the diagnostic details and analysis settings.',
+          diagnosticUnknown: 'The analyzer reported an unrecognized diagnostic: {code}.',
+          severityInfo: 'Info',
+          severityWarning: 'Warning',
+          severityError: 'Error',
+          diagnosticSourceReadFailed: 'Source file could not be read and was skipped.',
+          diagnosticSourceInvalidUtf8: 'Source file is not valid UTF-8 and was skipped.',
+          diagnosticSourceParseFailed: 'Source file could not be parsed and was skipped.',
+          diagnosticSourceNameResolutionFailed: 'Names in the source file could not be resolved and it was skipped.',
+          diagnosticDeclarationDuplicateFqcn: 'Declarations with the same FQCN were merged.',
+          diagnosticDeclarationKindConflict: 'Declarations with the same FQCN use different type kinds.',
+          diagnosticAnalysisNoTypes: 'No analyzable classes, interfaces, traits, or enums were found.',
+          diagnosticAnalysisSingleComponentDepth: 'All types were grouped into one component at the current namespace depth.',
+          diagnosticAnalysisSingleComponentUnevaluable: 'Only one component was found, so inter-component Ca, Ce, I, D, and cycles cannot be evaluated.',
+          actionCheckPermissions: 'Check the file path and read permissions.',
+          actionExcludeFile: 'Exclude the file with --exclude if it is outside the intended analysis scope.',
+          actionConvertToUtf8: 'Convert the file to UTF-8.',
+          actionFixSource: 'Fix the PHP source code.',
+          actionReviewDuplicate: 'Review the duplicate declarations and keep a single compatible definition.',
+          actionReviewSourcePaths: 'Review the source paths and exclusion patterns.',
+          actionIncreaseDepth: 'Increase --depth to inspect finer component boundaries.',
+          actionReviewComponentBoundary: 'Review the selected source scope and component boundary.',
           components: 'Components',
           plotted: 'Plotted',
           meanDistance: 'Mean D',
@@ -903,8 +988,33 @@ final class HtmlReporter implements ReporterInterface
           analyzedFiles: '解析済み',
           excludedFiles: '除外',
           skippedFiles: 'スキップ',
-          analysisWarnings: '解析時の警告',
-          warningIntro: '解析できなかったファイルがあります。このレポートを判断に使う前に、次のメッセージを確認してください。',
+          analysisDiagnostics: '解析上の注意',
+          diagnosticLocation: 'ソース位置',
+          diagnosticAction: '推奨する次の対応',
+          diagnosticDetails: '詳細',
+          diagnosticNoLocation: 'ソース位置は記録されていません。',
+          diagnosticNoAction: '診断の詳細と解析設定を確認してください。',
+          diagnosticUnknown: '未対応の診断コードが報告されました: {code}。',
+          severityInfo: '情報',
+          severityWarning: '警告',
+          severityError: 'エラー',
+          diagnosticSourceReadFailed: 'ファイルを読み込めないためスキップしました。',
+          diagnosticSourceInvalidUtf8: 'UTF-8として解釈できないためスキップしました。',
+          diagnosticSourceParseFailed: 'パースエラーのためスキップしました。',
+          diagnosticSourceNameResolutionFailed: '名前解決エラーのためスキップしました。',
+          diagnosticDeclarationDuplicateFqcn: '複数ファイルに同じFQCNの宣言があるため統合しました。',
+          diagnosticDeclarationKindConflict: '同じFQCNに異なる型種別の宣言があります。',
+          diagnosticAnalysisNoTypes: '解析可能なクラス、インターフェース、トレイト、enumが見つかりませんでした。',
+          diagnosticAnalysisSingleComponentDepth: '現在の名前空間深度では、すべての型が1コンポーネントにまとめられています。',
+          diagnosticAnalysisSingleComponentUnevaluable: 'コンポーネントが1件のみのため、コンポーネント間のCa、Ce、I、D、循環依存は評価できません。',
+          actionCheckPermissions: 'ファイルのパスと読み取り権限を確認してください。',
+          actionExcludeFile: '解析対象外なら--excludeでファイルを除外してください。',
+          actionConvertToUtf8: 'ファイルをUTF-8へ変換してください。',
+          actionFixSource: 'PHPソースコードを修正してください。',
+          actionReviewDuplicate: '重複した宣言を確認し、互換性のある定義を1つにしてください。',
+          actionReviewSourcePaths: 'ソースパスと除外パターンを確認してください。',
+          actionIncreaseDepth: 'より細かく分析する場合は--depthを増やしてください。',
+          actionReviewComponentBoundary: '解析対象とコンポーネント境界を確認してください。',
           components: 'コンポーネント',
           plotted: 'プロット',
           meanDistance: '平均D',
@@ -982,6 +1092,28 @@ final class HtmlReporter implements ReporterInterface
         },
       };
 
+      const diagnosticMessageKeys = {
+        'source.read_failed': 'diagnosticSourceReadFailed',
+        'source.invalid_utf8': 'diagnosticSourceInvalidUtf8',
+        'source.parse_failed': 'diagnosticSourceParseFailed',
+        'source.name_resolution_failed': 'diagnosticSourceNameResolutionFailed',
+        'declaration.duplicate_fqcn': 'diagnosticDeclarationDuplicateFqcn',
+        'declaration.kind_conflict': 'diagnosticDeclarationKindConflict',
+        'analysis.no_types': 'diagnosticAnalysisNoTypes',
+        'analysis.single_component_depth': 'diagnosticAnalysisSingleComponentDepth',
+        'analysis.single_component_unevaluable': 'diagnosticAnalysisSingleComponentUnevaluable',
+      };
+      const diagnosticActionKeys = {
+        check_permissions: 'actionCheckPermissions',
+        exclude_file: 'actionExcludeFile',
+        convert_to_utf8: 'actionConvertToUtf8',
+        fix_source: 'actionFixSource',
+        review_duplicate: 'actionReviewDuplicate',
+        review_source_paths: 'actionReviewSourcePaths',
+        increase_depth: 'actionIncreaseDepth',
+        review_component_boundary: 'actionReviewComponentBoundary',
+      };
+
       const SVG_NS = 'http://www.w3.org/2000/svg';
       const report = JSON.parse(document.getElementById('psap-data').textContent);
       const chart = document.getElementById('ia-chart');
@@ -1002,6 +1134,7 @@ final class HtmlReporter implements ReporterInterface
       const coverageMeter = document.getElementById('coverage-meter');
       const warningPanel = document.getElementById('warning-panel');
       const warningCount = document.getElementById('warning-count');
+      const diagnosticList = document.getElementById('diagnostic-list');
       const warningList = document.getElementById('warning-list');
       const cyclePanel = document.getElementById('cycle-panel');
       const cycleGroups = document.getElementById('cycle-groups');
@@ -1035,7 +1168,7 @@ final class HtmlReporter implements ReporterInterface
           element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
         });
         renderCoverage();
-        renderWarnings();
+        renderDiagnostics();
         update();
         renderCycles();
         if (selected) renderInspector(selected, selectedGroup);
@@ -1062,11 +1195,93 @@ final class HtmlReporter implements ReporterInterface
         });
       }
 
-      function renderWarnings() {
-        warningPanel.hidden = report.warnings.length === 0;
-        warningCount.textContent = String(report.warnings.length);
+      function diagnosticContext(context) {
+        return Object.entries(context || {}).map(([key, value]) => {
+          const display = typeof value === 'string' ? value : JSON.stringify(value);
+          return `${key}: ${display}`;
+        }).join(' · ');
+      }
+
+      function renderDiagnostic(diagnostic) {
+        const item = document.createElement('article');
+        item.className = 'diagnostic-item';
+
+        const reason = document.createElement('div');
+        reason.className = 'diagnostic-cell';
+        const meta = document.createElement('div');
+        meta.className = 'diagnostic-meta';
+        const normalizedSeverity = ['info', 'warning', 'error'].includes(diagnostic.severity)
+          ? diagnostic.severity
+          : 'warning';
+        appendTextElement(
+          meta,
+          'span',
+          messages[locale][`severity${normalizedSeverity.charAt(0).toUpperCase()}${normalizedSeverity.slice(1)}`] || diagnostic.severity,
+          `diagnostic-severity is-${normalizedSeverity}`,
+        );
+        appendTextElement(meta, 'code', diagnostic.code, 'diagnostic-code');
+        reason.append(meta);
+        const messageKey = diagnosticMessageKeys[diagnostic.code];
+        appendTextElement(
+          reason,
+          'p',
+          messageKey ? t(messageKey, diagnostic.context || {}) : t('diagnosticUnknown', { code: diagnostic.code }),
+          'diagnostic-reason',
+        );
+        const context = diagnosticContext(diagnostic.context);
+        if (context !== '') {
+          appendTextElement(reason, 'p', `${t('diagnosticDetails')}: ${context}`, 'diagnostic-context');
+        }
+        item.append(reason);
+
+        const source = document.createElement('div');
+        source.className = 'diagnostic-cell';
+        appendTextElement(source, 'span', t('diagnosticLocation'), 'diagnostic-label');
+        if (diagnostic.file === null) {
+          appendTextElement(source, 'span', t('diagnosticNoLocation'), 'diagnostic-context');
+        } else {
+          const location = diagnostic.line === null ? diagnostic.file : `${diagnostic.file}:${diagnostic.line}`;
+          appendTextElement(source, 'code', location, 'diagnostic-location');
+        }
+        item.append(source);
+
+        const remedy = document.createElement('div');
+        remedy.className = 'diagnostic-cell';
+        appendTextElement(remedy, 'span', t('diagnosticAction'), 'diagnostic-label');
+        const actions = document.createElement('ul');
+        actions.className = 'diagnostic-actions';
+        if (!Array.isArray(diagnostic.actions) || diagnostic.actions.length === 0) {
+          appendTextElement(actions, 'li', t('diagnosticNoAction'));
+        } else {
+          diagnostic.actions.forEach((action) => {
+            const entry = document.createElement('li');
+            const actionKey = diagnosticActionKeys[action];
+            appendTextElement(entry, 'span', actionKey ? t(actionKey) : action);
+            appendTextElement(entry, 'code', action);
+            actions.append(entry);
+          });
+        }
+        remedy.append(actions);
+        item.append(remedy);
+
+        diagnosticList.append(item);
+      }
+
+      function renderDiagnostics() {
+        const diagnostics = Array.isArray(report.diagnostics) ? report.diagnostics : [];
+        const warnings = diagnostics.length === 0 && Array.isArray(report.warnings) ? report.warnings : [];
+        warningPanel.hidden = diagnostics.length === 0 && warnings.length === 0;
+        warningPanel.classList.toggle(
+          'has-warning',
+          warnings.length > 0 || diagnostics.some((diagnostic) => diagnostic.severity === 'warning' || diagnostic.severity === 'error'),
+        );
+        warningCount.textContent = String(diagnostics.length || warnings.length);
+        diagnosticList.hidden = diagnostics.length === 0;
+        warningList.hidden = warnings.length === 0;
+        diagnosticList.replaceChildren();
         warningList.replaceChildren();
-        report.warnings.forEach((warning) => appendTextElement(warningList, 'li', warning));
+        diagnostics.forEach(renderDiagnostic);
+        warnings.forEach((warning) => appendTextElement(warningList, 'li', warning));
       }
 
       function svgElement(name, attributes = {}) {
@@ -1496,6 +1711,14 @@ HTML);
      *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
      *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|null}|null,
      *     warnings: list<string>,
+     *     diagnostics: list<array{
+     *         code: string,
+     *         severity: string,
+     *         file: string|null,
+     *         line: int|null,
+     *         context: object,
+     *         actions: list<string>
+     *     }>,
      *     components: list<array{
      *         name: string,
      *         classCount: int,
@@ -1547,6 +1770,20 @@ HTML);
                     : round($coverageRatio, 4),
             ],
             'warnings' => $data->warnings,
+            'diagnostics' => array_map(
+                static fn (Diagnostic $diagnostic): array => [
+                    'code' => $diagnostic->code->value,
+                    'severity' => $diagnostic->severity->value,
+                    'file' => $diagnostic->file,
+                    'line' => $diagnostic->line,
+                    'context' => (object) $diagnostic->context,
+                    'actions' => array_map(
+                        static fn (DiagnosticAction $action): string => $action->value,
+                        $diagnostic->actions,
+                    ),
+                ],
+                $data->diagnostics,
+            ),
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
             'cycles' => $data->cycleGroups(),
         ];
