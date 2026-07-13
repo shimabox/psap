@@ -47,6 +47,8 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('id="ia-chart"', $output);
         self::assertStringContainsString('id="tooltip"', $output);
         self::assertStringContainsString('id="inspector"', $output);
+        self::assertStringContainsString('this HTML report draws the radius-based boundaries used by psap', $output);
+        self::assertStringContainsString('Point metrics and coordinates come from the same analysis.', $output);
         self::assertStringContainsString('tabindex: \'0\'', $output);
         self::assertStringContainsString("element.addEventListener('focus', show)", $output);
         self::assertStringContainsString("element.addEventListener('click'", $output);

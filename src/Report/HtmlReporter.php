@@ -361,6 +361,12 @@ final class HtmlReporter implements ReporterInterface
     .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; background: var(--main); }
     .legend .pain { background: var(--pain); }
     .legend .useless { background: var(--useless); transform: rotate(45deg); }
+    .representation-note {
+      max-width: 760px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: .72rem;
+    }
 
     @media (max-width: 900px) {
       .masthead, .workspace { grid-template-columns: 1fr; }
@@ -473,6 +479,7 @@ final class HtmlReporter implements ReporterInterface
           <li><i class="pain"></i>Pain zone</li>
           <li><i class="useless"></i>Useless zone</li>
         </ul>
+        <p class="representation-note">Zone display: this HTML report draws the radius-based boundaries used by psap. Mermaid quadrant charts show the same zone concepts as quadrant labels, so their shapes are an approximation. Point metrics and coordinates come from the same analysis.</p>
       </div>
 
       <aside id="inspector" class="inspector" aria-live="polite" aria-label="Selected component">
