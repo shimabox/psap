@@ -633,6 +633,14 @@ final class HtmlReporter implements ReporterInterface
       </aside>
     </section>
 
+    <section class="table-panel" aria-label="Component data" data-i18n-aria-label="componentData">
+      <table>
+        <caption data-i18n="matchingComponents">Components matching the current filters</caption>
+        <thead><tr><th scope="col" data-i18n="component">Component</th><th scope="col" data-i18n="types">Types</th><th scope="col">Ca</th><th scope="col">Ce</th><th scope="col">I</th><th scope="col">A</th><th scope="col">D</th><th scope="col" data-i18n="zone">Zone</th></tr></thead>
+        <tbody id="component-rows"></tbody>
+      </table>
+    </section>
+
     <section id="cycle-panel" class="cycle-panel" aria-labelledby="cycle-heading" hidden>
       <header class="cycle-header">
         <p class="eyebrow" data-i18n="adpViolation">ADP violation</p>
@@ -640,14 +648,6 @@ final class HtmlReporter implements ReporterInterface
         <p data-i18n="cycleIntro">Each group shows one representative shortest path and the class-level evidence that creates its component dependencies.</p>
       </header>
       <div id="cycle-groups"></div>
-    </section>
-
-    <section class="table-panel" aria-label="Component data" data-i18n-aria-label="componentData">
-      <table>
-        <caption data-i18n="matchingComponents">Components matching the current filters</caption>
-        <thead><tr><th scope="col" data-i18n="component">Component</th><th scope="col" data-i18n="types">Types</th><th scope="col">Ca</th><th scope="col">Ce</th><th scope="col">I</th><th scope="col">A</th><th scope="col">D</th><th scope="col" data-i18n="zone">Zone</th></tr></thead>
-        <tbody id="component-rows"></tbody>
-      </table>
     </section>
   </main>
 
@@ -1059,7 +1059,6 @@ final class HtmlReporter implements ReporterInterface
           const details = document.createElement('details');
           details.id = `cycle-group-${index}`;
           details.className = 'cycle-group';
-          details.open = index === 0;
 
           const relation = cycle.namespaceRelation === 'hierarchical'
             ? t('hierarchicalNamespaces')

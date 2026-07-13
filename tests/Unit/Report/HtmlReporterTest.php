@@ -70,6 +70,12 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('id="inspector"', $output);
         self::assertStringContainsString('id="cycle-panel"', $output);
         self::assertStringContainsString('id="summary-cycles"', $output);
+        $tablePosition = strpos($output, '<section class="table-panel"');
+        $cyclePosition = strpos($output, '<section id="cycle-panel"');
+        self::assertNotFalse($tablePosition);
+        self::assertNotFalse($cyclePosition);
+        self::assertGreaterThan($tablePosition, $cyclePosition);
+        self::assertStringNotContainsString('details.open = index === 0', $output);
         self::assertStringContainsString('<html lang="en">', $output);
         self::assertStringContainsString('<select id="language">', $output);
         self::assertStringContainsString('<option value="ja">日本語</option>', $output);
