@@ -204,6 +204,43 @@ final class HtmlReporter implements ReporterInterface
       cursor: pointer;
     }
 
+    .warning-panel {
+      margin: 0 0 18px;
+      border: 1px solid rgb(181 75 53 / 45%);
+      border-left: 5px solid var(--pain);
+      background: rgb(181 75 53 / 7%);
+      box-shadow: 0 10px 28px rgb(24 37 47 / 7%);
+    }
+    .warning-panel[hidden] { display: none; }
+    .warning-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 13px 16px;
+    }
+    .warning-header h2 { margin: 0; font-size: .9rem; }
+    .warning-count {
+      min-width: 2.2em;
+      background: var(--pain);
+      color: white;
+      padding: 2px 8px;
+      text-align: center;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .74rem;
+    }
+    .warning-body { border-top: 1px solid rgb(181 75 53 / 28%); padding: 13px 16px 15px; }
+    .warning-body p { margin: 0 0 10px; color: var(--muted); font-size: .82rem; }
+    .warning-list {
+      max-height: 180px;
+      margin: 0;
+      padding-left: 22px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .76rem;
+    }
+    .warning-list li { padding: 4px 0; overflow-wrap: anywhere; }
+
     .workspace {
       display: grid;
       grid-template-columns: minmax(0, 1.65fr) minmax(300px, .75fr);
@@ -552,6 +589,14 @@ final class HtmlReporter implements ReporterInterface
       </div>
     </header>
 
+    <section id="warning-panel" class="warning-panel" aria-labelledby="warning-heading" hidden>
+      <header class="warning-header"><h2 id="warning-heading" data-i18n="analysisWarnings">Analysis warnings</h2><span id="warning-count" class="warning-count">0</span></header>
+      <div class="warning-body">
+        <p data-i18n="warningIntro">Some files could not be analyzed. Review these messages before relying on this report.</p>
+        <ul id="warning-list" class="warning-list"></ul>
+      </div>
+    </section>
+
     <section class="toolbar" aria-label="Graph filters" data-i18n-aria-label="graphFilters">
       <div class="field">
         <label for="search" data-i18n="findComponent">Find a component or class</label>
@@ -664,6 +709,8 @@ final class HtmlReporter implements ReporterInterface
           description: 'Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.',
           language: 'Language',
           analysisSummary: 'Analysis summary',
+          analysisWarnings: 'Analysis warnings',
+          warningIntro: 'Some files could not be analyzed. Review these messages before relying on this report.',
           components: 'Components',
           plotted: 'Plotted',
           meanDistance: 'Mean D',
@@ -746,6 +793,8 @@ final class HtmlReporter implements ReporterInterface
           description: '各点は名前空間コンポーネントを表します。マウスを重ねるとSAP指標を、選択するとその点に含まれるクラスを確認できます。',
           language: '表示言語',
           analysisSummary: '解析概要',
+          analysisWarnings: '解析時の警告',
+          warningIntro: '解析できなかったファイルがあります。このレポートを判断に使う前に、次のメッセージを確認してください。',
           components: 'コンポーネント',
           plotted: 'プロット',
           meanDistance: '平均D',
@@ -837,6 +886,9 @@ final class HtmlReporter implements ReporterInterface
       const distanceOutput = document.getElementById('distance-output');
       const resultCount = document.getElementById('result-count');
       const language = document.getElementById('language');
+      const warningPanel = document.getElementById('warning-panel');
+      const warningCount = document.getElementById('warning-count');
+      const warningList = document.getElementById('warning-list');
       const cyclePanel = document.getElementById('cycle-panel');
       const cycleGroups = document.getElementById('cycle-groups');
       const plot = { left: 70, top: 30, size: 540 };
@@ -868,9 +920,17 @@ final class HtmlReporter implements ReporterInterface
         document.querySelectorAll('[data-i18n-aria-label]').forEach((element) => {
           element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
         });
+        renderWarnings();
         update();
         renderCycles();
         if (selected) renderInspector(selected, selectedGroup);
+      }
+
+      function renderWarnings() {
+        warningPanel.hidden = report.warnings.length === 0;
+        warningCount.textContent = String(report.warnings.length);
+        warningList.replaceChildren();
+        report.warnings.forEach((warning) => appendTextElement(warningList, 'li', warning));
       }
 
       function svgElement(name, attributes = {}) {
@@ -1298,6 +1358,7 @@ HTML);
     /**
      * @return array{
      *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
+     *     warnings: list<string>,
      *     components: list<array{
      *         name: string,
      *         classCount: int,
@@ -1336,6 +1397,7 @@ HTML);
                 'meanDistance' => $data->summary->meanDistance === null ? null : round($data->summary->meanDistance, 4),
                 'cycleGroupCount' => count($data->cycles),
             ],
+            'warnings' => $data->warnings,
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
             'cycles' => $data->cycleGroups(),
         ];

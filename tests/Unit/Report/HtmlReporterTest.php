@@ -47,6 +47,7 @@ use Psap\Report\ReportData;
  * }
  * @phpstan-type HtmlPayload array{
  *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
+ *     warnings: list<string>,
  *     components: list<HtmlComponent>,
  *     cycles: list<HtmlCycle>
  * }
@@ -71,6 +72,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('id="tooltip"', $output);
         self::assertStringContainsString('id="inspector"', $output);
         self::assertStringContainsString('id="cycle-panel"', $output);
+        self::assertStringContainsString('id="warning-panel"', $output);
         self::assertStringContainsString('id="summary-cycles"', $output);
         $tablePosition = strpos($output, '<section class="table-panel"');
         $cyclePosition = strpos($output, '<section id="cycle-panel"');
@@ -87,6 +89,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('不安定度と抽象度の交点。', $output);
         self::assertStringContainsString("containedClasses: '含まれるクラス'", $output);
         self::assertStringContainsString("cycleHeading: '循環依存が検出されました'", $output);
+        self::assertStringContainsString("analysisWarnings: '解析時の警告'", $output);
         self::assertStringContainsString("noMatches: '絞り込みに一致するコンポーネントがありません。", $output);
         self::assertStringContainsString("metricIName: 'Instability (I)'", $output);
         self::assertStringContainsString("metricIHelp: 'Ce / (Ca + Ce).", $output);
@@ -106,6 +109,25 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('src="https://', $output);
         self::assertStringNotContainsString('href="https://', $output);
         self::assertStringNotContainsString('fetch(', $output);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testEmbedsAndRendersAnalysisWarnings(): void
+    {
+        $metrics = [$this->metrics('App\\Domain', 0.2, 0.75, 0.05)];
+        $warning = 'UTF-8として解釈できないためスキップしました: /project/Latin1.php:18';
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), [$warning]);
+
+        $output = (new HtmlReporter())->render($data);
+        $payload = $this->payload($output);
+
+        self::assertSame([$warning], $payload['warnings']);
+        self::assertStringContainsString('id="warning-count"', $output);
+        self::assertStringContainsString('id="warning-list"', $output);
+        self::assertStringContainsString('warningPanel.hidden = report.warnings.length === 0', $output);
+        self::assertStringContainsString("appendTextElement(warningList, 'li', warning)", $output);
     }
 
     /**

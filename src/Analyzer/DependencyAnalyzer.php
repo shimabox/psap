@@ -74,10 +74,12 @@ final class DependencyAnalyzer
                 continue;
             }
 
-            if (preg_match('//u', $code) !== 1) {
+            $invalidUtf8Line = $this->firstInvalidUtf8Line($code);
+            if ($invalidUtf8Line !== null) {
                 $warnings[] = sprintf(
-                    'UTF-8として解釈できないためスキップしました: %s（UTF-8へ変換するか、--excludeで除外してください）',
+                    'UTF-8として解釈できないためスキップしました: %s:%d（UTF-8へ変換するか、--excludeで除外してください）',
                     $filePath,
+                    $invalidUtf8Line,
                 );
 
                 continue;
@@ -114,6 +116,21 @@ final class DependencyAnalyzer
         [$classInfos, $duplicateWarnings] = $this->mergeDuplicateDeclarations($classInfos);
 
         return new AnalysisResult($classInfos, [...$warnings, ...$duplicateWarnings]);
+    }
+
+    private function firstInvalidUtf8Line(string $code): ?int
+    {
+        if (preg_match('//u', $code) === 1) {
+            return null;
+        }
+
+        foreach (explode("\n", $code) as $index => $line) {
+            if (preg_match('//u', $line) !== 1) {
+                return $index + 1;
+            }
+        }
+
+        return 1;
     }
 
     /**

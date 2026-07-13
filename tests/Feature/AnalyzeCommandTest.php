@@ -144,11 +144,12 @@ final class AnalyzeCommandTest extends TestCase
                 $report = (string) file_get_contents($outputPath);
                 if ($format === 'html') {
                     self::assertStringStartsWith('<!doctype html>', $report);
+                    self::assertStringContainsString('Latin1.php:3', $report);
                 } else {
                     $decoded = $this->decodeJson($report);
-                    self::assertStringContainsString('Latin1.php', implode("\n", $decoded['warnings']));
+                    self::assertStringContainsString('Latin1.php:3', implode("\n", $decoded['warnings']));
                 }
-                self::assertStringContainsString('Latin1.php', $tester->getErrorOutput());
+                self::assertStringContainsString('Latin1.php:3', $tester->getErrorOutput());
                 self::assertStringContainsString('UTF-8', $tester->getErrorOutput());
                 self::assertStringContainsString('--exclude', $tester->getErrorOutput());
                 @unlink($outputPath);

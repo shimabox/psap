@@ -137,7 +137,7 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertSame('Fixture\\Encoding\\Valid', $result->classInfos[0]->fqcn);
         self::assertCount(1, $result->warnings);
         self::assertStringContainsString('UTF-8', $result->warnings[0]);
-        self::assertStringContainsString($invalidPath, $result->warnings[0]);
+        self::assertStringContainsString($invalidPath . ':3', $result->warnings[0]);
         self::assertStringContainsString('--exclude', $result->warnings[0]);
     }
 
