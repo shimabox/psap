@@ -9,6 +9,7 @@ use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\CyclePathFinder;
 use Psap\Component\DependencyGraph;
+use Psap\Diagnostic\Diagnostic;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
 
@@ -31,6 +32,7 @@ final readonly class ReportData
      * @param list<list<string>> $cycles 循環依存（ADP違反）。各要素は循環しているコンポーネント名のリスト
      * @param list<string> $sourcePaths 解析対象として指定されたパス
      * @param list<string> $excludePatterns 解析から除外したパターン
+     * @param list<Diagnostic> $diagnostics 機械可読な構造化診断
      */
     public function __construct(
         public array $componentMetrics,
@@ -44,6 +46,7 @@ final readonly class ReportData
         public bool $docblockEnabled = true,
         public array $excludePatterns = [],
         public ?AnalysisCoverage $analysisCoverage = null,
+        public array $diagnostics = [],
     ) {
         $components = array_map(
             static fn (ComponentMetrics $metrics): Component => $metrics->component,

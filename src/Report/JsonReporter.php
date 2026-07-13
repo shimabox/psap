@@ -6,6 +6,9 @@ namespace Psap\Report;
 
 use JsonException;
 use Psap\Analyzer\ClassInfo;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticFormatter;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\Zone;
 
@@ -47,7 +50,8 @@ final class JsonReporter implements ReporterInterface
                 'skipped' => $data->analysisCoverage->skipped,
                 'analysisCoverage' => $data->analysisCoverage->ratio(),
             ],
-            'warnings' => $data->warnings,
+            'diagnostics' => array_map($this->diagnosticPayload(...), $data->diagnostics),
+            'warnings' => $this->compatibilityWarnings($data),
         ];
 
         try {
@@ -95,6 +99,46 @@ final class JsonReporter implements ReporterInterface
     private function rounded(?float $value): ?float
     {
         return $value === null ? null : round($value, self::ROUND_PRECISION);
+    }
+
+    /**
+     * @return array{
+     *     code: string,
+     *     severity: string,
+     *     file: string|null,
+     *     line: int|null,
+     *     message: string,
+     *     context: object,
+     *     actions: list<array{code: string, option?: string}>,
+     * }
+     */
+    private function diagnosticPayload(Diagnostic $diagnostic): array
+    {
+        $formatter = new DiagnosticFormatter('en');
+
+        return [
+            'code' => $diagnostic->code->value,
+            'severity' => $diagnostic->severity->value,
+            'file' => $diagnostic->file,
+            'line' => $diagnostic->line,
+            'message' => $formatter->message($diagnostic),
+            'context' => (object) $diagnostic->context,
+            'actions' => array_map(
+                static fn (DiagnosticAction $action): array => $action === DiagnosticAction::ExcludeFile
+                    ? ['code' => $action->value, 'option' => '--exclude']
+                    : ['code' => $action->value],
+                $diagnostic->actions,
+            ),
+        ];
+    }
+
+    /** @return list<string> */
+    private function compatibilityWarnings(ReportData $data): array
+    {
+        $formatter = new DiagnosticFormatter('ja');
+        $diagnosticWarnings = array_map($formatter->format(...), $data->diagnostics);
+
+        return array_values(array_unique([...$data->warnings, ...$diagnosticWarnings]));
     }
 
     private function zoneValue(Zone $zone): ?string

@@ -11,6 +11,10 @@ use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticCode;
+use Psap\Diagnostic\DiagnosticSeverity;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
 use Psap\Metrics\Zone;
@@ -103,6 +107,30 @@ final class MarkdownReporterTest extends TestCase
         self::assertStringContainsString('Mean D and variance D are not evaluable.', $output);
         self::assertStringNotContainsString('## Circular Dependencies', $output);
         self::assertStringNotContainsString('## Dependency Hotspots', $output);
+    }
+
+    public function testRendersStructuredDiagnosticsInEnglish(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            diagnostics: [new Diagnostic(
+                code: DiagnosticCode::SourceParseFailed,
+                severity: DiagnosticSeverity::Warning,
+                file: 'src/Broken.php',
+                line: 7,
+                context: ['detail' => 'Unexpected token.'],
+                actions: [DiagnosticAction::FixSource, DiagnosticAction::ExcludeFile],
+            )],
+        );
+
+        $output = (new MarkdownReporter())->render($data);
+
+        self::assertStringContainsString('## Diagnostics', $output);
+        self::assertStringContainsString('**Warning** `source.parse_failed`', $output);
+        self::assertStringContainsString('src/Broken.php:7', $output);
+        self::assertStringContainsString('Fix the PHP source code.', $output);
     }
 
     public function testAddsFileCoverageToAnalysisSummary(): void
