@@ -62,6 +62,8 @@ final class HtmlReporterTest extends TestCase
 
         self::assertStringStartsWith('<!doctype html>', $output);
         self::assertStringContainsString('<title>psap — Interactive I/A report</title>', $output);
+        self::assertStringContainsString('<h1 data-i18n="headline">Instability / Abstractness Analysis</h1>', $output);
+        self::assertStringNotContainsString('Instability meets abstraction.', $output);
         self::assertStringContainsString('id="ia-chart"', $output);
         self::assertStringContainsString('aria-label="SAP instability and abstractness graph"', $output);
         self::assertStringContainsString('aria-describedby="chart-description"', $output);

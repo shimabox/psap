@@ -532,7 +532,7 @@ final class HtmlReporter implements ReporterInterface
     <header class="masthead">
       <div>
         <p class="eyebrow" data-i18n="eyebrow">psap / architecture inspection board</p>
-        <h1 data-i18n="headline">Instability meets abstraction.</h1>
+        <h1 data-i18n="headline">Instability / Abstractness Analysis</h1>
         <p class="dek" data-i18n="description">Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.</p>
       </div>
       <div class="masthead-side">
@@ -660,7 +660,7 @@ final class HtmlReporter implements ReporterInterface
         en: {
           documentTitle: 'psap — Interactive I/A report',
           eyebrow: 'psap / architecture inspection board',
-          headline: 'Instability meets abstraction.',
+          headline: 'Instability / Abstractness Analysis',
           description: 'Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.',
           language: 'Language',
           analysisSummary: 'Analysis summary',
@@ -742,7 +742,7 @@ final class HtmlReporter implements ReporterInterface
         ja: {
           documentTitle: 'psap — 対話型I/Aレポート',
           eyebrow: 'psap / architecture inspection board',
-          headline: 'Instability meets abstraction.',
+          headline: 'Instability / Abstractness Analysis',
           description: '各点は名前空間コンポーネントを表します。マウスを重ねるとSAP指標を、選択するとその点に含まれるクラスを確認できます。',
           language: '表示言語',
           analysisSummary: '解析概要',
