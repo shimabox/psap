@@ -98,7 +98,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString("containedClasses: '含まれるクラス'", $output);
         self::assertStringContainsString("cycleHeading: '循環依存が検出されました'", $output);
         self::assertStringContainsString("analysisCoverage: '解析カバレッジ'", $output);
-        self::assertStringContainsString("analysisDiagnostics: '解析診断'", $output);
+        self::assertStringContainsString("analysisDiagnostics: '解析上の注意'", $output);
         self::assertStringContainsString("diagnosticAction: '推奨する次の対応'", $output);
         self::assertStringContainsString("noMatches: '絞り込みに一致するコンポーネントがありません。", $output);
         self::assertStringContainsString("metricIName: 'Instability (I)'", $output);

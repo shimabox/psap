@@ -300,7 +300,6 @@ final class HtmlReporter implements ReporterInterface
     .warning-panel.has-warning .warning-count { background: var(--pain); }
     .warning-body { border-top: 1px solid var(--grid); }
     .warning-panel.has-warning .warning-body { border-top-color: rgb(181 75 53 / 28%); }
-    .warning-intro { margin: 0; padding: 12px 16px; color: var(--muted); font-size: .82rem; }
     .diagnostic-list { border-top: 1px solid var(--grid); }
     .diagnostic-item {
       display: grid;
@@ -743,9 +742,8 @@ final class HtmlReporter implements ReporterInterface
     </section>
 
     <section id="warning-panel" class="warning-panel" aria-labelledby="warning-heading" hidden>
-      <header class="warning-header"><h2 id="warning-heading" data-i18n="analysisDiagnostics">Analysis diagnostics</h2><span id="warning-count" class="warning-count">0</span></header>
+      <header class="warning-header"><h2 id="warning-heading" data-i18n="analysisDiagnostics">Analysis notices</h2><span id="warning-count" class="warning-count">0</span></header>
       <div class="warning-body">
-        <p class="warning-intro" data-i18n="diagnosticIntro">Read each diagnostic from reason to source location to the recommended next step.</p>
         <div id="diagnostic-list" class="diagnostic-list"></div>
         <ul id="warning-list" class="warning-list" hidden></ul>
       </div>
@@ -872,8 +870,7 @@ final class HtmlReporter implements ReporterInterface
           analyzedFiles: 'Analyzed',
           excludedFiles: 'Excluded',
           skippedFiles: 'Skipped',
-          analysisDiagnostics: 'Analysis diagnostics',
-          diagnosticIntro: 'Read each diagnostic from reason to source location to the recommended next step.',
+          analysisDiagnostics: 'Analysis notices',
           diagnosticLocation: 'Source location',
           diagnosticAction: 'Recommended next step',
           diagnosticDetails: 'Details',
@@ -991,8 +988,7 @@ final class HtmlReporter implements ReporterInterface
           analyzedFiles: '解析済み',
           excludedFiles: '除外',
           skippedFiles: 'スキップ',
-          analysisDiagnostics: '解析診断',
-          diagnosticIntro: '各診断を「理由、ソース位置、推奨する次の対応」の順に確認できます。',
+          analysisDiagnostics: '解析上の注意',
           diagnosticLocation: 'ソース位置',
           diagnosticAction: '推奨する次の対応',
           diagnosticDetails: '詳細',
