@@ -311,9 +311,50 @@ final class HtmlReporter implements ReporterInterface
       border-top: 1px solid var(--grid);
       border-left: 1px solid var(--grid);
     }
-    .metric-grid div { padding: 10px; border-right: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
+    .metric-grid > div {
+      position: relative;
+      padding: 10px;
+      border-right: 1px solid var(--grid);
+      border-bottom: 1px solid var(--grid);
+    }
+    .metric-grid > div:hover, .metric-grid > div:focus { background: #f2f6ff; }
     .metric-grid dt { color: var(--muted); font-size: .66rem; text-transform: uppercase; }
     .metric-grid dd { margin: 2px 0 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: 700; }
+    .metric-definition {
+      position: absolute;
+      top: 35px;
+      z-index: 20;
+      visibility: hidden;
+      width: min(260px, calc(100vw - 48px));
+      border: 1px solid var(--ink);
+      background: rgb(24 37 47 / 97%);
+      color: white;
+      padding: 10px 12px;
+      box-shadow: 0 10px 30px rgb(24 37 47 / 25%);
+      opacity: 0;
+      text-transform: none;
+      transition: opacity 120ms ease;
+    }
+    .metric-grid > div:nth-child(3n + 1) .metric-definition { left: 8px; }
+    .metric-grid > div:nth-child(3n + 2) .metric-definition { left: 50%; transform: translateX(-50%); }
+    .metric-grid > div:nth-child(3n) .metric-definition { right: 8px; }
+    .metric-grid > div:hover .metric-definition,
+    .metric-grid > div:focus .metric-definition {
+      visibility: visible;
+      opacity: 1;
+    }
+    .metric-definition strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: .72rem;
+      letter-spacing: .02em;
+    }
+    .metric-definition span {
+      display: block;
+      color: #dce7ee;
+      font-size: .7rem;
+      line-height: 1.45;
+    }
     .class-heading { margin: 20px 0 8px; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }
     .class-list, .coordinate-list { margin: 0; padding: 0; list-style: none; }
     .class-list { max-height: 390px; overflow: auto; border-top: 1px solid var(--grid); }
@@ -456,8 +497,7 @@ final class HtmlReporter implements ReporterInterface
           <span data-i18n="keyboardHelp">Keyboard: Tab to a point, Enter to select, Esc to clear.</span>
         </div>
         <div class="plot-wrap">
-          <svg id="ia-chart" viewBox="0 0 640 620" role="group" aria-labelledby="chart-title chart-description">
-            <title id="chart-title" data-i18n="chartTitle">SAP instability and abstractness graph</title>
+          <svg id="ia-chart" viewBox="0 0 640 620" role="group" aria-label="SAP instability and abstractness graph" aria-describedby="chart-description" data-i18n-aria-label="chartTitle">
             <desc id="chart-description" data-i18n="chartDescription">Instability runs from zero to one on the horizontal axis. Abstractness runs from zero to one on the vertical axis. Select a point to inspect its component classes.</desc>
             <g aria-hidden="true">
               <path class="zone-pain" d="M70 570 L70 300 A270 270 0 0 1 340 570 Z"></path>
@@ -563,6 +603,18 @@ final class HtmlReporter implements ReporterInterface
           kindAbstract: 'abstract',
           kindEnum: 'enum',
           kindTrait: 'trait',
+          metricIName: 'Instability (I)',
+          metricIHelp: 'Ce / (Ca + Ce). Near 0 means stable; near 1 means unstable.',
+          metricAName: 'Abstractness (A)',
+          metricAHelp: 'Abstract types / all types. 0 means fully concrete; 1 means fully abstract.',
+          metricDName: 'Distance from main sequence (D)',
+          metricDHelp: '|A + I - 1|. Near 0 means abstractness and stability are well balanced.',
+          metricCaName: 'Afferent coupling (Ca)',
+          metricCaHelp: 'Number of external classes that depend on classes in this component. Higher means more classes rely on it.',
+          metricCeName: 'Efferent coupling (Ce)',
+          metricCeHelp: 'Number of classes in this component that depend on external classes. Higher means it relies on more outside classes.',
+          metricTypesName: 'Types',
+          metricTypesHelp: 'Number of class, interface, abstract class, enum, and trait declarations in this component.',
           pointLabel: '{name}. I {i}, A {a}, D {d}',
           stackedPointLabel: '{count} components at I {i}, A {a}',
           sameCoordinates: '{name} + {count} at same coordinates',
@@ -615,6 +667,18 @@ final class HtmlReporter implements ReporterInterface
           kindAbstract: '抽象クラス',
           kindEnum: 'enum',
           kindTrait: 'トレイト',
+          metricIName: '不安定度 (I)',
+          metricIHelp: 'Ce / (Ca + Ce)。0に近いほど安定、1に近いほど不安定です。',
+          metricAName: '抽象度 (A)',
+          metricAHelp: '抽象型数 / 総型数。0はすべて具象、1はすべて抽象です。',
+          metricDName: '主系列からの距離 (D)',
+          metricDHelp: '|A + I - 1|。0に近いほど抽象度と安定度のバランスがよいことを示します。',
+          metricCaName: '求心性結合度 (Ca)',
+          metricCaHelp: 'このコンポーネント内のクラスに依存する外部クラスの数です。大きいほど多くのクラスから使われています。',
+          metricCeName: '遠心性結合度 (Ce)',
+          metricCeHelp: '外部クラスに依存する、このコンポーネント内のクラスの数です。大きいほど多くの外部クラスを使っています。',
+          metricTypesName: '型数',
+          metricTypesHelp: 'このコンポーネントに含まれるクラス、インターフェース、抽象クラス、enum、トレイトの宣言数です。',
           pointLabel: '{name}。I {i}、A {a}、D {d}',
           stackedPointLabel: '同じ座標に{count}コンポーネント。I {i}、A {a}',
           sameCoordinates: '{name} 他{count}件（同じ座標）',
@@ -820,6 +884,30 @@ final class HtmlReporter implements ReporterInterface
         return element;
       }
 
+      function appendMetric(parent, definition) {
+        const wrapper = document.createElement('div');
+        const tooltipId = `metric-${definition.key}-help`;
+        wrapper.tabIndex = 0;
+        wrapper.setAttribute('role', 'group');
+        wrapper.setAttribute('aria-label', `${t(`${definition.key}Name`)}: ${definition.displayValue}`);
+        wrapper.setAttribute('aria-describedby', tooltipId);
+
+        const term = document.createElement('dt');
+        appendTextElement(term, 'span', definition.label);
+
+        const tooltip = document.createElement('span');
+        tooltip.id = tooltipId;
+        tooltip.className = 'metric-definition';
+        tooltip.setAttribute('role', 'tooltip');
+        appendTextElement(tooltip, 'strong', t(`${definition.key}Name`));
+        appendTextElement(tooltip, 'span', t(`${definition.key}Help`));
+
+        term.append(tooltip);
+        wrapper.append(term);
+        appendTextElement(wrapper, 'dd', definition.displayValue);
+        parent.append(wrapper);
+      }
+
       function renderInspector(component, coordinateGroup = [component]) {
         inspector.replaceChildren();
         appendTextElement(inspector, 'p', t('selectedComponent'), 'eyebrow');
@@ -828,12 +916,14 @@ final class HtmlReporter implements ReporterInterface
 
         const metrics = document.createElement('dl');
         metrics.className = 'metric-grid';
-        [['I', component.instability], ['A', component.abstractness], ['D', component.distance], ['Ca', component.ca], ['Ce', component.ce], [t('types'), component.classCount]].forEach(([label, metric]) => {
-          const wrapper = document.createElement('div');
-          appendTextElement(wrapper, 'dt', label);
-          appendTextElement(wrapper, 'dd', typeof metric === 'number' && label !== 'Ca' && label !== 'Ce' && label !== t('types') ? value(metric) : String(metric));
-          metrics.append(wrapper);
-        });
+        [
+          { key: 'metricI', label: 'I', displayValue: value(component.instability) },
+          { key: 'metricA', label: 'A', displayValue: value(component.abstractness) },
+          { key: 'metricD', label: 'D', displayValue: value(component.distance) },
+          { key: 'metricCa', label: 'Ca', displayValue: String(component.ca) },
+          { key: 'metricCe', label: 'Ce', displayValue: String(component.ce) },
+          { key: 'metricTypes', label: t('types'), displayValue: String(component.classCount) },
+        ].forEach((definition) => appendMetric(metrics, definition));
         inspector.append(metrics);
 
         if (coordinateGroup.length > 1) {

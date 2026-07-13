@@ -45,6 +45,9 @@ final class HtmlReporterTest extends TestCase
         self::assertStringStartsWith('<!doctype html>', $output);
         self::assertStringContainsString('<title>psap — Interactive I/A report</title>', $output);
         self::assertStringContainsString('id="ia-chart"', $output);
+        self::assertStringContainsString('aria-label="SAP instability and abstractness graph"', $output);
+        self::assertStringContainsString('aria-describedby="chart-description"', $output);
+        self::assertStringNotContainsString('<title id="chart-title"', $output);
         self::assertStringContainsString('id="tooltip"', $output);
         self::assertStringContainsString('id="inspector"', $output);
         self::assertStringContainsString('<html lang="en">', $output);
@@ -56,6 +59,16 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('不安定度と抽象度の交点。', $output);
         self::assertStringContainsString("containedClasses: '含まれるクラス'", $output);
         self::assertStringContainsString("noMatches: '絞り込みに一致するコンポーネントがありません。", $output);
+        self::assertStringContainsString("metricIName: 'Instability (I)'", $output);
+        self::assertStringContainsString("metricIHelp: 'Ce / (Ca + Ce).", $output);
+        self::assertStringContainsString("metricCaName: '求心性結合度 (Ca)'", $output);
+        self::assertStringContainsString("metricDHelp: '|A + I - 1|。", $output);
+        self::assertStringContainsString("tooltip.setAttribute('role', 'tooltip')", $output);
+        self::assertStringContainsString("wrapper.setAttribute('aria-describedby', tooltipId)", $output);
+        self::assertStringContainsString('wrapper.tabIndex = 0', $output);
+        self::assertStringContainsString('.metric-grid > div:hover .metric-definition', $output);
+        self::assertStringNotContainsString('className = \'metric-help\'', $output);
+        self::assertStringNotContainsString('cursor: help', $output);
         self::assertStringContainsString('this HTML report draws the radius-based boundaries used by psap', $output);
         self::assertStringContainsString('Point metrics and coordinates come from the same analysis.', $output);
         self::assertStringContainsString('tabindex: \'0\'', $output);
