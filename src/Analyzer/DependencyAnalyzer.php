@@ -16,6 +16,10 @@ use Psap\Analyzer\Internal\DependencyNameCollector;
 use Psap\Analyzer\Internal\DependencyReference;
 use Psap\Analyzer\Internal\DocblockTypeExtractor;
 use Psap\Analyzer\Internal\RootClassLikeCollector;
+use Psap\Diagnostic\Diagnostic;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticCode;
+use Psap\Diagnostic\DiagnosticSeverity;
 
 /**
  * PHP ソースファイル群を解析し、型宣言ごとの依存関係（ClassInfo）を抽出する。
@@ -64,14 +68,19 @@ final class DependencyAnalyzer
     public function analyze(array $filePaths): AnalysisResult
     {
         $classInfos = [];
-        $warnings = [];
+        $diagnostics = [];
         $analyzedFileCount = 0;
         $skippedFileCount = 0;
 
         foreach ($filePaths as $filePath) {
             $code = @file_get_contents($filePath);
             if ($code === false) {
-                $warnings[] = sprintf('ファイルを読み込めませんでした: %s', $filePath);
+                $diagnostics[] = new Diagnostic(
+                    code: DiagnosticCode::SourceReadFailed,
+                    severity: DiagnosticSeverity::Warning,
+                    file: $this->relativeFilePath($filePath),
+                    actions: [DiagnosticAction::CheckPermissions, DiagnosticAction::ExcludeFile],
+                );
                 ++$skippedFileCount;
 
                 continue;
@@ -79,10 +88,12 @@ final class DependencyAnalyzer
 
             $invalidUtf8Line = $this->firstInvalidUtf8Line($code);
             if ($invalidUtf8Line !== null) {
-                $warnings[] = sprintf(
-                    'UTF-8として解釈できないためスキップしました: %s:%d（UTF-8へ変換するか、--excludeで除外してください）',
-                    $filePath,
-                    $invalidUtf8Line,
+                $diagnostics[] = new Diagnostic(
+                    code: DiagnosticCode::SourceInvalidUtf8,
+                    severity: DiagnosticSeverity::Warning,
+                    file: $this->relativeFilePath($filePath),
+                    line: $invalidUtf8Line,
+                    actions: [DiagnosticAction::ConvertToUtf8, DiagnosticAction::ExcludeFile],
                 );
                 ++$skippedFileCount;
 
@@ -92,7 +103,14 @@ final class DependencyAnalyzer
             try {
                 $ast = $this->parser->parse($code);
             } catch (Error $e) {
-                $warnings[] = sprintf('パースエラーのためスキップしました: %s (%s)', $filePath, $e->getMessage());
+                $diagnostics[] = new Diagnostic(
+                    code: DiagnosticCode::SourceParseFailed,
+                    severity: DiagnosticSeverity::Warning,
+                    file: $this->relativeFilePath($filePath),
+                    line: $this->errorLine($e),
+                    context: ['detail' => $e->getMessage()],
+                    actions: [DiagnosticAction::FixSource, DiagnosticAction::ExcludeFile],
+                );
                 ++$skippedFileCount;
 
                 continue;
@@ -117,16 +135,23 @@ final class DependencyAnalyzer
                 }
                 ++$analyzedFileCount;
             } catch (Error $e) {
-                $warnings[] = sprintf('名前解決エラーのためスキップしました: %s (%s)', $filePath, $e->getMessage());
+                $diagnostics[] = new Diagnostic(
+                    code: DiagnosticCode::SourceNameResolutionFailed,
+                    severity: DiagnosticSeverity::Warning,
+                    file: $this->relativeFilePath($filePath),
+                    line: $this->errorLine($e),
+                    context: ['detail' => $e->getMessage()],
+                    actions: [DiagnosticAction::FixSource, DiagnosticAction::ExcludeFile],
+                );
                 ++$skippedFileCount;
             }
         }
 
-        [$classInfos, $duplicateWarnings] = $this->mergeDuplicateDeclarations($classInfos);
+        [$classInfos, $duplicateDiagnostics] = $this->mergeDuplicateDeclarations($classInfos);
 
         return new AnalysisResult(
             classInfos: $classInfos,
-            warnings: [...$warnings, ...$duplicateWarnings],
+            diagnostics: [...$diagnostics, ...$duplicateDiagnostics],
             analyzedFileCount: $analyzedFileCount,
             skippedFileCount: $skippedFileCount,
         );
@@ -147,17 +172,24 @@ final class DependencyAnalyzer
         return 1;
     }
 
+    private function errorLine(Error $error): ?int
+    {
+        $line = $error->getStartLine();
+
+        return $line > 0 ? $line : null;
+    }
+
     /**
      * 条件分岐による互換実装など、同じFQCNを持つ宣言を1型へまとめる。
      *
      * @param list<ClassInfo> $classInfos
-     * @return array{list<ClassInfo>, list<string>}
+     * @return array{list<ClassInfo>, list<Diagnostic>}
      */
     private function mergeDuplicateDeclarations(array $classInfos): array
     {
         /** @var array<string, ClassInfo> $mergedByFqcn */
         $mergedByFqcn = [];
-        $warnings = [];
+        $diagnostics = [];
 
         foreach ($classInfos as $classInfo) {
             $key = strtolower($classInfo->fqcn);
@@ -169,9 +201,29 @@ final class DependencyAnalyzer
             }
 
             if ($existing->kind !== $classInfo->kind) {
-                $warnings[] = sprintf('同じFQCNに異なる型種別の宣言があります: %s', $existing->fqcn);
+                $diagnostics[] = new Diagnostic(
+                    code: DiagnosticCode::DeclarationKindConflict,
+                    severity: DiagnosticSeverity::Warning,
+                    file: $this->relativeFilePath($classInfo->filePath),
+                    context: [
+                        'fqcn' => $existing->fqcn,
+                        'existingKind' => $existing->kind->label(),
+                        'duplicateKind' => $classInfo->kind->label(),
+                        'existingFile' => $this->relativeFilePath($existing->filePath),
+                    ],
+                    actions: [DiagnosticAction::ReviewDuplicate],
+                );
             } elseif ($existing->filePath !== $classInfo->filePath) {
-                $warnings[] = sprintf('複数ファイルに同じFQCNの宣言があるため統合しました: %s', $existing->fqcn);
+                $diagnostics[] = new Diagnostic(
+                    code: DiagnosticCode::DeclarationDuplicateFqcn,
+                    severity: DiagnosticSeverity::Warning,
+                    file: $this->relativeFilePath($classInfo->filePath),
+                    context: [
+                        'fqcn' => $existing->fqcn,
+                        'existingFile' => $this->relativeFilePath($existing->filePath),
+                    ],
+                    actions: [DiagnosticAction::ReviewDuplicate],
+                );
             }
 
             $mergedByFqcn[$key] = new ClassInfo(
@@ -183,7 +235,7 @@ final class DependencyAnalyzer
             );
         }
 
-        return [array_values($mergedByFqcn), $warnings];
+        return [array_values($mergedByFqcn), $diagnostics];
     }
 
     /**

@@ -12,6 +12,9 @@ use Psap\Analyzer\DependencyAnalyzer;
 use Psap\Analyzer\DependencyKind;
 use Psap\Analyzer\SourceFinder;
 use Psap\Analyzer\TypeKind;
+use Psap\Diagnostic\DiagnosticAction;
+use Psap\Diagnostic\DiagnosticCode;
+use Psap\Diagnostic\DiagnosticSeverity;
 
 // DependencyAnalyzer: 型種別の判定・依存関係抽出（数えるもの一式）・
 // グローバル名前空間・パースエラー時の警告とスキップ・無名クラスの扱いのテスト
@@ -115,6 +118,10 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertStringContainsString('Broken.php', $result->warnings[0]);
         self::assertSame(count($files), $result->analyzedFileCount + $result->skippedFileCount);
         self::assertSame(1, $result->skippedFileCount);
+        self::assertSame(DiagnosticCode::SourceParseFailed, $result->diagnostics[0]->code);
+        self::assertSame(DiagnosticSeverity::Warning, $result->diagnostics[0]->severity);
+        self::assertNotNull($result->diagnostics[0]->line);
+        self::assertSame([DiagnosticAction::FixSource, DiagnosticAction::ExcludeFile], $result->diagnostics[0]->actions);
 
         // 壊れていないファイルは問題なく解析できる
         $valid = $this->findByFqcn($result->classInfos, 'Fixture\\Broken\\Valid');
@@ -143,6 +150,9 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertStringContainsString('--exclude', $result->warnings[0]);
         self::assertSame(1, $result->analyzedFileCount);
         self::assertSame(1, $result->skippedFileCount);
+        self::assertSame(DiagnosticCode::SourceInvalidUtf8, $result->diagnostics[0]->code);
+        self::assertSame(3, $result->diagnostics[0]->line);
+        self::assertSame([DiagnosticAction::ConvertToUtf8, DiagnosticAction::ExcludeFile], $result->diagnostics[0]->actions);
     }
 
     public function testNameResolutionErrorIsCollectedAsWarningAndSkipped(): void
@@ -162,6 +172,8 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertStringContainsString('名前解決エラーのためスキップしました', $result->warnings[0]);
         self::assertSame(0, $result->analyzedFileCount);
         self::assertSame(1, $result->skippedFileCount);
+        self::assertSame(DiagnosticCode::SourceNameResolutionFailed, $result->diagnostics[0]->code);
+        self::assertSame([DiagnosticAction::FixSource, DiagnosticAction::ExcludeFile], $result->diagnostics[0]->actions);
     }
 
     public function testUnreadableFileIsCountedAsSkipped(): void
@@ -174,6 +186,8 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertSame(1, $result->skippedFileCount);
         self::assertCount(1, $result->warnings);
         self::assertStringContainsString($missingPath, $result->warnings[0]);
+        self::assertSame(DiagnosticCode::SourceReadFailed, $result->diagnostics[0]->code);
+        self::assertSame([DiagnosticAction::CheckPermissions, DiagnosticAction::ExcludeFile], $result->diagnostics[0]->actions);
     }
 
     public function testFileWithoutTypeDeclarationsIsCountedAsAnalyzed(): void
@@ -203,6 +217,36 @@ final class DependencyAnalyzerTest extends TestCase
         $result = new AnalysisResult(classInfos: [], warnings: []);
 
         self::assertSame(0, $result->analyzedFileCount);
+        self::assertSame(0, $result->skippedFileCount);
+        self::assertSame([], $result->diagnostics);
+    }
+
+    public function testDiagnosticFileIsRelativeToTheLongestMatchingSourceRoot(): void
+    {
+        $invalidPath = $this->createTempFile("<?php\nclass " . chr(0xA9) . " {}\n");
+        $sourceRoot = dirname($invalidPath);
+
+        $result = (new DependencyAnalyzer(sourceRoots: [$sourceRoot, dirname($sourceRoot)]))->analyze([$invalidPath]);
+
+        self::assertSame(basename($invalidPath), $result->diagnostics[0]->file);
+    }
+
+    public function testReportsDuplicateFqcnAndKindConflictAsStructuredDiagnostics(): void
+    {
+        $classPath = $this->createTempFile('<?php namespace Fixture; class Duplicate {}');
+        $sameKindPath = $this->createTempFile('<?php namespace Fixture; class Duplicate {}');
+        $conflictingKindPath = $this->createTempFile('<?php namespace Fixture; interface Duplicate {}');
+
+        $result = (new DependencyAnalyzer())->analyze([$classPath, $sameKindPath, $conflictingKindPath]);
+
+        self::assertSame(
+            [DiagnosticCode::DeclarationDuplicateFqcn, DiagnosticCode::DeclarationKindConflict],
+            array_map(static fn ($diagnostic): DiagnosticCode => $diagnostic->code, $result->diagnostics),
+        );
+        self::assertSame('Fixture\\Duplicate', $result->diagnostics[0]->context['fqcn']);
+        self::assertSame($sameKindPath, $result->diagnostics[0]->file);
+        self::assertSame([DiagnosticAction::ReviewDuplicate], $result->diagnostics[0]->actions);
+        self::assertSame(3, $result->analyzedFileCount);
         self::assertSame(0, $result->skippedFileCount);
     }
 
