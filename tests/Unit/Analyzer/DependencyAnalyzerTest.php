@@ -122,6 +122,25 @@ final class DependencyAnalyzerTest extends TestCase
         self::assertNull($this->tryFindByFqcn($result->classInfos, 'Fixture\\Broken\\Broken'));
     }
 
+    public function testInvalidUtf8IsCollectedAsWarningAndSkipped(): void
+    {
+        $validPath = $this->createTempFile(<<<'PHP'
+            <?php
+            namespace Fixture\Encoding;
+            class Valid {}
+            PHP);
+        $invalidPath = $this->createTempFile("<?php\nnamespace Fixture\\Encoding;\nclass " . chr(0xA9) . " {}\n");
+
+        $result = (new DependencyAnalyzer())->analyze([$invalidPath, $validPath]);
+
+        self::assertCount(1, $result->classInfos);
+        self::assertSame('Fixture\\Encoding\\Valid', $result->classInfos[0]->fqcn);
+        self::assertCount(1, $result->warnings);
+        self::assertStringContainsString('UTF-8', $result->warnings[0]);
+        self::assertStringContainsString($invalidPath . ':3', $result->warnings[0]);
+        self::assertStringContainsString('--exclude', $result->warnings[0]);
+    }
+
     public function testNameResolutionErrorIsCollectedAsWarningAndSkipped(): void
     {
         $code = <<<'PHP'
