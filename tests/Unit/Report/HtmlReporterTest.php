@@ -47,6 +47,15 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('id="ia-chart"', $output);
         self::assertStringContainsString('id="tooltip"', $output);
         self::assertStringContainsString('id="inspector"', $output);
+        self::assertStringContainsString('<html lang="en">', $output);
+        self::assertStringContainsString('<select id="language">', $output);
+        self::assertStringContainsString('<option value="ja">日本語</option>', $output);
+        self::assertStringContainsString("let locale = 'en'", $output);
+        self::assertStringContainsString("language.addEventListener('change'", $output);
+        self::assertStringNotContainsString('psap / アーキテクチャ検査ボード', $output);
+        self::assertStringNotContainsString('不安定度と抽象度の交点。', $output);
+        self::assertStringContainsString("containedClasses: '含まれるクラス'", $output);
+        self::assertStringContainsString("noMatches: '絞り込みに一致するコンポーネントがありません。", $output);
         self::assertStringContainsString('this HTML report draws the radius-based boundaries used by psap', $output);
         self::assertStringContainsString('Point metrics and coordinates come from the same analysis.', $output);
         self::assertStringContainsString('tabindex: \'0\'', $output);

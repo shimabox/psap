@@ -87,6 +87,14 @@ final class HtmlReporter implements ReporterInterface
       margin-bottom: 24px;
     }
 
+    .masthead-side {
+      display: grid;
+      gap: 10px;
+      justify-items: end;
+    }
+
+    .language-field { min-width: 150px; }
+
     .eyebrow {
       margin: 0 0 6px;
       color: var(--main);
@@ -370,6 +378,7 @@ final class HtmlReporter implements ReporterInterface
 
     @media (max-width: 900px) {
       .masthead, .workspace { grid-template-columns: 1fr; }
+      .masthead-side { justify-items: stretch; }
       .summary { width: 100%; }
       .toolbar { grid-template-columns: 1fr 1fr; }
       .inspector { border-top: 1px solid var(--grid); border-left: 0; }
@@ -396,51 +405,60 @@ final class HtmlReporter implements ReporterInterface
   <main class="shell">
     <header class="masthead">
       <div>
-        <p class="eyebrow">psap / architecture inspection board</p>
-        <h1>Instability meets abstraction.</h1>
-        <p class="dek">Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.</p>
+        <p class="eyebrow" data-i18n="eyebrow">psap / architecture inspection board</p>
+        <h1 data-i18n="headline">Instability meets abstraction.</h1>
+        <p class="dek" data-i18n="description">Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.</p>
       </div>
-      <dl class="summary" aria-label="Analysis summary">
-        <div><dt>Components</dt><dd id="summary-components">—</dd></div>
-        <div><dt>Plotted</dt><dd id="summary-plotted">—</dd></div>
-        <div><dt>Mean D</dt><dd id="summary-distance">—</dd></div>
-      </dl>
+      <div class="masthead-side">
+        <div class="field language-field">
+          <label for="language" data-i18n="language">Language</label>
+          <select id="language">
+            <option value="en" selected>English</option>
+            <option value="ja">日本語</option>
+          </select>
+        </div>
+        <dl class="summary" aria-label="Analysis summary" data-i18n-aria-label="analysisSummary">
+          <div><dt data-i18n="components">Components</dt><dd id="summary-components">—</dd></div>
+          <div><dt data-i18n="plotted">Plotted</dt><dd id="summary-plotted">—</dd></div>
+          <div><dt data-i18n="meanDistance">Mean D</dt><dd id="summary-distance">—</dd></div>
+        </dl>
+      </div>
     </header>
 
-    <section class="toolbar" aria-label="Graph filters">
+    <section class="toolbar" aria-label="Graph filters" data-i18n-aria-label="graphFilters">
       <div class="field">
-        <label for="search">Find a component or class</label>
-        <input id="search" type="search" placeholder="e.g. Domain or UserRepository" autocomplete="off">
+        <label for="search" data-i18n="findComponent">Find a component or class</label>
+        <input id="search" type="search" placeholder="e.g. Domain or UserRepository" data-i18n-placeholder="searchPlaceholder" autocomplete="off">
       </div>
       <div class="field">
-        <label for="zone-filter">Zone</label>
+        <label for="zone-filter" data-i18n="zone">Zone</label>
         <select id="zone-filter">
-          <option value="all">All zones</option>
-          <option value="none">Main sequence</option>
-          <option value="pain">Pain zone</option>
-          <option value="useless">Useless zone</option>
+          <option value="all" data-i18n="allZones">All zones</option>
+          <option value="none" data-i18n="mainSequence">Main sequence</option>
+          <option value="pain" data-i18n="painZone">Pain zone</option>
+          <option value="useless" data-i18n="uselessZone">Useless zone</option>
         </select>
       </div>
       <div class="field">
-        <label for="distance-filter">Minimum distance (D)</label>
+        <label for="distance-filter" data-i18n="minimumDistance">Minimum distance (D)</label>
         <div class="range-line">
           <input id="distance-filter" type="range" min="0" max="1" step="0.01" value="0">
           <output id="distance-output" for="distance-filter">0.00</output>
         </div>
       </div>
-      <button id="reset" class="reset" type="button">Reset filters</button>
+      <button id="reset" class="reset" type="button" data-i18n="resetFilters">Reset filters</button>
     </section>
 
     <section class="workspace">
       <div class="plot-panel">
         <div class="plot-meta">
-          <strong id="result-count" aria-live="polite">Loading components…</strong>
-          <span>Keyboard: Tab to a point, Enter to select, Esc to clear.</span>
+          <strong id="result-count" aria-live="polite" data-i18n="loadingComponents">Loading components…</strong>
+          <span data-i18n="keyboardHelp">Keyboard: Tab to a point, Enter to select, Esc to clear.</span>
         </div>
         <div class="plot-wrap">
           <svg id="ia-chart" viewBox="0 0 640 620" role="group" aria-labelledby="chart-title chart-description">
-            <title id="chart-title">SAP instability and abstractness graph</title>
-            <desc id="chart-description">Instability runs from zero to one on the horizontal axis. Abstractness runs from zero to one on the vertical axis. Select a point to inspect its component classes.</desc>
+            <title id="chart-title" data-i18n="chartTitle">SAP instability and abstractness graph</title>
+            <desc id="chart-description" data-i18n="chartDescription">Instability runs from zero to one on the horizontal axis. Abstractness runs from zero to one on the vertical axis. Select a point to inspect its component classes.</desc>
             <g aria-hidden="true">
               <path class="zone-pain" d="M70 570 L70 300 A270 270 0 0 1 340 570 Z"></path>
               <path class="zone-useless" d="M610 30 L340 30 A270 270 0 0 0 610 300 Z"></path>
@@ -453,9 +471,9 @@ final class HtmlReporter implements ReporterInterface
               <line class="axis-line" x1="70" y1="30" x2="70" y2="570"></line>
               <line class="axis-line" x1="70" y1="570" x2="610" y2="570"></line>
               <line class="main-sequence" x1="70" y1="30" x2="610" y2="570"></line>
-              <text class="chart-copy zone-copy" x="92" y="545">Pain zone</text>
-              <text class="chart-copy zone-copy" x="588" y="56" text-anchor="end">Useless zone</text>
-              <text class="chart-copy" x="350" y="286" transform="rotate(45 350 286)">Main sequence · A + I = 1</text>
+              <text class="chart-copy zone-copy" x="92" y="545" data-i18n="painZone">Pain zone</text>
+              <text class="chart-copy zone-copy" x="588" y="56" text-anchor="end" data-i18n="uselessZone">Useless zone</text>
+              <text class="chart-copy" x="350" y="286" transform="rotate(45 350 286)" data-i18n="mainSequenceFormula">Main sequence · A + I = 1</text>
               <text class="chart-copy" x="70" y="590" text-anchor="middle">0</text>
               <text class="chart-copy" x="205" y="590" text-anchor="middle">.25</text>
               <text class="chart-copy" x="340" y="590" text-anchor="middle">.50</text>
@@ -466,33 +484,33 @@ final class HtmlReporter implements ReporterInterface
               <text class="chart-copy" x="55" y="304" text-anchor="end">.50</text>
               <text class="chart-copy" x="55" y="169" text-anchor="end">.75</text>
               <text class="chart-copy" x="55" y="34" text-anchor="end">1</text>
-              <text class="chart-copy" x="340" y="613" text-anchor="middle">Instability (I)</text>
-              <text class="chart-copy" x="15" y="300" text-anchor="middle" transform="rotate(-90 15 300)">Abstractness (A)</text>
+              <text class="chart-copy" x="340" y="613" text-anchor="middle" data-i18n="instabilityAxis">Instability (I)</text>
+              <text class="chart-copy" x="15" y="300" text-anchor="middle" transform="rotate(-90 15 300)" data-i18n="abstractnessAxis">Abstractness (A)</text>
             </g>
             <g id="projection-layer" aria-hidden="true"></g>
             <g id="point-layer"></g>
           </svg>
           <div id="tooltip" class="tooltip" role="tooltip" hidden><strong></strong><span></span></div>
         </div>
-        <ul class="legend" aria-label="Point legend">
-          <li><i></i>Main sequence</li>
-          <li><i class="pain"></i>Pain zone</li>
-          <li><i class="useless"></i>Useless zone</li>
+        <ul class="legend" aria-label="Point legend" data-i18n-aria-label="pointLegend">
+          <li><i></i><span data-i18n="mainSequence">Main sequence</span></li>
+          <li><i class="pain"></i><span data-i18n="painZone">Pain zone</span></li>
+          <li><i class="useless"></i><span data-i18n="uselessZone">Useless zone</span></li>
         </ul>
-        <p class="representation-note">Zone display: this HTML report draws the radius-based boundaries used by psap. Mermaid quadrant charts show the same zone concepts as quadrant labels, so their shapes are an approximation. Point metrics and coordinates come from the same analysis.</p>
+        <p class="representation-note" data-i18n="representationNote">Zone display: this HTML report draws the radius-based boundaries used by psap. Mermaid quadrant charts show the same zone concepts as quadrant labels, so their shapes are an approximation. Point metrics and coordinates come from the same analysis.</p>
       </div>
 
-      <aside id="inspector" class="inspector" aria-live="polite" aria-label="Selected component">
-        <p class="eyebrow">Selected component</p>
-        <h2>No component selected</h2>
-        <p class="inspector-empty">Choose a point or a row below. Its SAP metrics and contained classes will stay pinned here.</p>
+      <aside id="inspector" class="inspector" aria-live="polite" aria-label="Selected component" data-i18n-aria-label="selectedComponent">
+        <p class="eyebrow" data-i18n="selectedComponent">Selected component</p>
+        <h2 data-i18n="noComponentSelected">No component selected</h2>
+        <p class="inspector-empty" data-i18n="inspectorEmpty">Choose a point or a row below. Its SAP metrics and contained classes will stay pinned here.</p>
       </aside>
     </section>
 
-    <section class="table-panel" aria-label="Component data">
+    <section class="table-panel" aria-label="Component data" data-i18n-aria-label="componentData">
       <table>
-        <caption>Components matching the current filters</caption>
-        <thead><tr><th scope="col">Component</th><th scope="col">Types</th><th scope="col">Ca</th><th scope="col">Ce</th><th scope="col">I</th><th scope="col">A</th><th scope="col">D</th><th scope="col">Zone</th></tr></thead>
+        <caption data-i18n="matchingComponents">Components matching the current filters</caption>
+        <thead><tr><th scope="col" data-i18n="component">Component</th><th scope="col" data-i18n="types">Types</th><th scope="col">Ca</th><th scope="col">Ce</th><th scope="col">I</th><th scope="col">A</th><th scope="col">D</th><th scope="col" data-i18n="zone">Zone</th></tr></thead>
         <tbody id="component-rows"></tbody>
       </table>
     </section>
@@ -502,6 +520,113 @@ final class HtmlReporter implements ReporterInterface
   <script>
     (() => {
       'use strict';
+
+      const messages = {
+        en: {
+          documentTitle: 'psap — Interactive I/A report',
+          eyebrow: 'psap / architecture inspection board',
+          headline: 'Instability meets abstraction.',
+          description: 'Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.',
+          language: 'Language',
+          analysisSummary: 'Analysis summary',
+          components: 'Components',
+          plotted: 'Plotted',
+          meanDistance: 'Mean D',
+          graphFilters: 'Graph filters',
+          findComponent: 'Find a component or class',
+          searchPlaceholder: 'e.g. Domain or UserRepository',
+          zone: 'Zone',
+          allZones: 'All zones',
+          mainSequence: 'Main sequence',
+          painZone: 'Pain zone',
+          uselessZone: 'Useless zone',
+          minimumDistance: 'Minimum distance (D)',
+          resetFilters: 'Reset filters',
+          loadingComponents: 'Loading components…',
+          keyboardHelp: 'Keyboard: Tab to a point, Enter to select, Esc to clear.',
+          chartTitle: 'SAP instability and abstractness graph',
+          chartDescription: 'Instability runs from zero to one on the horizontal axis. Abstractness runs from zero to one on the vertical axis. Select a point to inspect its component classes.',
+          mainSequenceFormula: 'Main sequence · A + I = 1',
+          instabilityAxis: 'Instability (I)',
+          abstractnessAxis: 'Abstractness (A)',
+          pointLegend: 'Point legend',
+          representationNote: 'Zone display: this HTML report draws the radius-based boundaries used by psap. Mermaid quadrant charts show the same zone concepts as quadrant labels, so their shapes are an approximation. Point metrics and coordinates come from the same analysis.',
+          selectedComponent: 'Selected component',
+          noComponentSelected: 'No component selected',
+          inspectorEmpty: 'Choose a point or a row below. Its SAP metrics and contained classes will stay pinned here.',
+          componentData: 'Component data',
+          matchingComponents: 'Components matching the current filters',
+          component: 'Component',
+          types: 'Types',
+          kindConcrete: 'concrete',
+          kindInterface: 'interface',
+          kindAbstract: 'abstract',
+          kindEnum: 'enum',
+          kindTrait: 'trait',
+          pointLabel: '{name}. I {i}, A {a}, D {d}',
+          stackedPointLabel: '{count} components at I {i}, A {a}',
+          sameCoordinates: '{name} + {count} at same coordinates',
+          tooltipMetrics: 'I {i} · A {a} · D {d} · Ca {ca} · Ce {ce} · {count} types',
+          typesAndZone: '{count} types · {zone}',
+          componentsSharePoint: '{count} components share this point',
+          containedClasses: 'Contained classes',
+          noClasses: 'No class declarations were recorded.',
+          noMatches: 'No components match these filters. Reset filters to see the full report.',
+          resultCount: '{shown} of {total} plotted components shown',
+        },
+        ja: {
+          documentTitle: 'psap — 対話型I/Aレポート',
+          eyebrow: 'psap / architecture inspection board',
+          headline: 'Instability meets abstraction.',
+          description: '各点は名前空間コンポーネントを表します。マウスを重ねるとSAP指標を、選択するとその点に含まれるクラスを確認できます。',
+          language: '表示言語',
+          analysisSummary: '解析概要',
+          components: 'コンポーネント',
+          plotted: 'プロット',
+          meanDistance: '平均D',
+          graphFilters: 'グラフの絞り込み',
+          findComponent: 'コンポーネントまたはクラスを検索',
+          searchPlaceholder: '例: Domain、UserRepository',
+          zone: 'ゾーン',
+          allZones: 'すべてのゾーン',
+          mainSequence: '主系列',
+          painZone: '苦痛ゾーン',
+          uselessZone: '無駄ゾーン',
+          minimumDistance: '最小距離 (D)',
+          resetFilters: '絞り込みを解除',
+          loadingComponents: 'コンポーネントを読み込み中…',
+          keyboardHelp: 'キーボード: Tabで点へ移動、Enterで選択、Escで解除。',
+          chartTitle: 'SAP 不安定度・抽象度グラフ',
+          chartDescription: '横軸は0から1までの不安定度、縦軸は0から1までの抽象度です。点を選ぶとコンポーネントに含まれるクラスを確認できます。',
+          mainSequenceFormula: '主系列 · A + I = 1',
+          instabilityAxis: '不安定度 (I)',
+          abstractnessAxis: '抽象度 (A)',
+          pointLegend: '点の凡例',
+          representationNote: 'ゾーン表示: このHTMLレポートはpsapの実際の判定と同じ円弧境界を描きます。MermaidのquadrantChartは同じ概念を象限ラベルで近似します。点の指標と座標は同じ解析結果です。',
+          selectedComponent: '選択中のコンポーネント',
+          noComponentSelected: 'コンポーネントが選択されていません',
+          inspectorEmpty: 'グラフの点または下の一覧を選ぶと、SAP指標と含まれるクラスをここに固定表示します。',
+          componentData: 'コンポーネントデータ',
+          matchingComponents: '現在の絞り込みに一致するコンポーネント',
+          component: 'コンポーネント',
+          types: '型数',
+          kindConcrete: '具象クラス',
+          kindInterface: 'インターフェース',
+          kindAbstract: '抽象クラス',
+          kindEnum: 'enum',
+          kindTrait: 'トレイト',
+          pointLabel: '{name}。I {i}、A {a}、D {d}',
+          stackedPointLabel: '同じ座標に{count}コンポーネント。I {i}、A {a}',
+          sameCoordinates: '{name} 他{count}件（同じ座標）',
+          tooltipMetrics: 'I {i} · A {a} · D {d} · Ca {ca} · Ce {ce} · {count}型',
+          typesAndZone: '{count}型 · {zone}',
+          componentsSharePoint: '{count}コンポーネントが同じ点にあります',
+          containedClasses: '含まれるクラス',
+          noClasses: 'クラス宣言は記録されていません。',
+          noMatches: '絞り込みに一致するコンポーネントがありません。絞り込みを解除すると全件を表示できます。',
+          resultCount: 'プロット対象{total}件中{shown}件を表示',
+        },
+      };
 
       const SVG_NS = 'http://www.w3.org/2000/svg';
       const report = JSON.parse(document.getElementById('psap-data').textContent);
@@ -516,13 +641,36 @@ final class HtmlReporter implements ReporterInterface
       const distanceFilter = document.getElementById('distance-filter');
       const distanceOutput = document.getElementById('distance-output');
       const resultCount = document.getElementById('result-count');
+      const language = document.getElementById('language');
       const plot = { left: 70, top: 30, size: 540 };
+      let locale = 'en';
       let selected = null;
+      let selectedGroup = [];
 
       const evaluable = report.components.filter((component) => component.metricsEvaluable);
       document.getElementById('summary-components').textContent = String(report.summary.componentCount);
       document.getElementById('summary-plotted').textContent = String(evaluable.length);
       document.getElementById('summary-distance').textContent = report.summary.meanDistance === null ? 'N/A' : report.summary.meanDistance.toFixed(2);
+
+      function t(key, values = {}) {
+        return messages[locale][key].replace(/\{(\w+)\}/g, (match, name) => Object.hasOwn(values, name) ? String(values[name]) : match);
+      }
+
+      function applyLanguage() {
+        document.documentElement.lang = locale;
+        document.title = t('documentTitle');
+        document.querySelectorAll('[data-i18n]').forEach((element) => {
+          element.textContent = t(element.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
+          element.setAttribute('placeholder', t(element.dataset.i18nPlaceholder));
+        });
+        document.querySelectorAll('[data-i18n-aria-label]').forEach((element) => {
+          element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
+        });
+        update();
+        if (selected) renderInspector(selected, selectedGroup);
+      }
 
       function svgElement(name, attributes = {}) {
         const element = document.createElementNS(SVG_NS, name);
@@ -535,16 +683,21 @@ final class HtmlReporter implements ReporterInterface
       }
 
       function zoneName(zone) {
-        if (zone === 'pain') return 'Pain';
-        if (zone === 'useless') return 'Useless';
-        return 'Main sequence';
+        if (zone === 'pain') return t('painZone');
+        if (zone === 'useless') return t('uselessZone');
+        return t('mainSequence');
+      }
+
+      function kindName(kind) {
+        const key = `kind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
+        return messages[locale][key] || kind;
       }
 
       function matches(component) {
         const query = search.value.trim().toLocaleLowerCase();
         const zone = zoneFilter.value;
         const minimumDistance = Number(distanceFilter.value);
-        const haystack = [component.name, ...component.classes.map((item) => `${item.fqcn} ${item.kind}`)].join(' ').toLocaleLowerCase();
+        const haystack = [component.name, ...component.classes.map((item) => `${item.fqcn} ${item.kind} ${kindName(item.kind)}`)].join(' ').toLocaleLowerCase();
         return component.metricsEvaluable
           && (query === '' || haystack.includes(query))
           && (zone === 'all' || (component.zone || 'none') === zone)
@@ -577,8 +730,8 @@ final class HtmlReporter implements ReporterInterface
           tabindex: '0',
           role: 'button',
           'aria-label': group.length === 1
-            ? `${component.name}. I ${value(component.instability)}, A ${value(component.abstractness)}, D ${value(component.distance)}`
-            : `${group.length} components at I ${value(component.instability)}, A ${value(component.abstractness)}`,
+            ? t('pointLabel', { name: component.name, i: value(component.instability), a: value(component.abstractness), d: value(component.distance) })
+            : t('stackedPointLabel', { count: group.length, i: value(component.instability), a: value(component.abstractness) }),
         });
 
         element.append(svgElement('circle', { class: 'hit', cx: x, cy: y, r: 17 }));
@@ -617,8 +770,15 @@ final class HtmlReporter implements ReporterInterface
 
       function showTooltip(group, event) {
         const component = group[0];
-        tooltip.querySelector('strong').textContent = group.length === 1 ? component.name : `${component.name} + ${group.length - 1} at same coordinates`;
-        tooltip.querySelector('span').textContent = `I ${value(component.instability)} · A ${value(component.abstractness)} · D ${value(component.distance)} · Ca ${component.ca} · Ce ${component.ce} · ${component.classCount} types`;
+        tooltip.querySelector('strong').textContent = group.length === 1 ? component.name : t('sameCoordinates', { name: component.name, count: group.length - 1 });
+        tooltip.querySelector('span').textContent = t('tooltipMetrics', {
+          i: value(component.instability),
+          a: value(component.abstractness),
+          d: value(component.distance),
+          ca: component.ca,
+          ce: component.ce,
+          count: component.classCount,
+        });
         tooltip.hidden = false;
         let x = event.clientX;
         let y = event.clientY;
@@ -662,22 +822,22 @@ final class HtmlReporter implements ReporterInterface
 
       function renderInspector(component, coordinateGroup = [component]) {
         inspector.replaceChildren();
-        appendTextElement(inspector, 'p', 'Selected component', 'eyebrow');
+        appendTextElement(inspector, 'p', t('selectedComponent'), 'eyebrow');
         appendTextElement(inspector, 'h2', component.name);
-        appendTextElement(inspector, 'p', `${component.classCount} types · ${zoneName(component.zone)}`);
+        appendTextElement(inspector, 'p', t('typesAndZone', { count: component.classCount, zone: zoneName(component.zone) }));
 
         const metrics = document.createElement('dl');
         metrics.className = 'metric-grid';
-        [['I', component.instability], ['A', component.abstractness], ['D', component.distance], ['Ca', component.ca], ['Ce', component.ce], ['Types', component.classCount]].forEach(([label, metric]) => {
+        [['I', component.instability], ['A', component.abstractness], ['D', component.distance], ['Ca', component.ca], ['Ce', component.ce], [t('types'), component.classCount]].forEach(([label, metric]) => {
           const wrapper = document.createElement('div');
           appendTextElement(wrapper, 'dt', label);
-          appendTextElement(wrapper, 'dd', typeof metric === 'number' && label !== 'Ca' && label !== 'Ce' && label !== 'Types' ? value(metric) : String(metric));
+          appendTextElement(wrapper, 'dd', typeof metric === 'number' && label !== 'Ca' && label !== 'Ce' && label !== t('types') ? value(metric) : String(metric));
           metrics.append(wrapper);
         });
         inspector.append(metrics);
 
         if (coordinateGroup.length > 1) {
-          appendTextElement(inspector, 'h3', `${coordinateGroup.length} components share this point`, 'class-heading');
+          appendTextElement(inspector, 'h3', t('componentsSharePoint', { count: coordinateGroup.length }), 'class-heading');
           const alternatives = document.createElement('ul');
           alternatives.className = 'coordinate-list';
           coordinateGroup.forEach((item) => {
@@ -692,16 +852,16 @@ final class HtmlReporter implements ReporterInterface
           inspector.append(alternatives);
         }
 
-        appendTextElement(inspector, 'h3', 'Contained classes', 'class-heading');
+        appendTextElement(inspector, 'h3', t('containedClasses'), 'class-heading');
         const list = document.createElement('ul');
         list.className = 'class-list';
         if (component.classes.length === 0) {
-          appendTextElement(list, 'li', 'No class declarations were recorded.');
+          appendTextElement(list, 'li', t('noClasses'));
         } else {
           component.classes.forEach((item) => {
             const entry = document.createElement('li');
             appendTextElement(entry, 'code', item.fqcn);
-            appendTextElement(entry, 'span', item.kind, 'kind');
+            appendTextElement(entry, 'span', kindName(item.kind), 'kind');
             list.append(entry);
           });
         }
@@ -710,6 +870,7 @@ final class HtmlReporter implements ReporterInterface
 
       function selectComponent(component, coordinateGroup = [component]) {
         selected = component;
+        selectedGroup = coordinateGroup;
         renderInspector(component, coordinateGroup);
         renderProjection(component);
         renderPoints(filteredComponents());
@@ -717,11 +878,12 @@ final class HtmlReporter implements ReporterInterface
 
       function clearSelection() {
         selected = null;
+        selectedGroup = [];
         projectionLayer.replaceChildren();
         inspector.replaceChildren();
-        appendTextElement(inspector, 'p', 'Selected component', 'eyebrow');
-        appendTextElement(inspector, 'h2', 'No component selected');
-        appendTextElement(inspector, 'p', 'Choose a point or a row below. Its SAP metrics and contained classes will stay pinned here.', 'inspector-empty');
+        appendTextElement(inspector, 'p', t('selectedComponent'), 'eyebrow');
+        appendTextElement(inspector, 'h2', t('noComponentSelected'));
+        appendTextElement(inspector, 'p', t('inspectorEmpty'), 'inspector-empty');
         renderPoints(filteredComponents());
       }
 
@@ -741,7 +903,7 @@ final class HtmlReporter implements ReporterInterface
           const cell = document.createElement('td');
           cell.colSpan = 8;
           cell.className = 'empty-row';
-          cell.textContent = 'No components match these filters. Reset filters to see the full report.';
+          cell.textContent = t('noMatches');
           row.append(cell);
           rows.append(row);
           return;
@@ -767,7 +929,7 @@ final class HtmlReporter implements ReporterInterface
         hideTooltip();
         distanceOutput.textContent = Number(distanceFilter.value).toFixed(2);
         const components = filteredComponents();
-        resultCount.textContent = `${components.length} of ${evaluable.length} plotted components shown`;
+        resultCount.textContent = t('resultCount', { shown: components.length, total: evaluable.length });
         renderPoints(components);
         renderRows(components);
         if (selected && !components.some((component) => component.name === selected.name)) clearSelection();
@@ -776,6 +938,10 @@ final class HtmlReporter implements ReporterInterface
       search.addEventListener('input', update);
       zoneFilter.addEventListener('change', update);
       distanceFilter.addEventListener('input', update);
+      language.addEventListener('change', () => {
+        locale = language.value;
+        applyLanguage();
+      });
       document.getElementById('reset').addEventListener('click', () => {
         search.value = '';
         zoneFilter.value = 'all';
@@ -787,7 +953,7 @@ final class HtmlReporter implements ReporterInterface
         if (event.key === 'Escape') clearSelection();
       });
 
-      update();
+      applyLanguage();
     })();
   </script>
 </body>
