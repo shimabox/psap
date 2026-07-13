@@ -120,6 +120,44 @@ final class MermaidReporterTest extends TestCase
         self::assertStringContainsString('"App\\Infra (D=0.00)": [0.9, 0.1]', $output);
     }
 
+    public function testHighlightsCycleComponentsWithLabelAndPointStyle(): void
+    {
+        $metrics = [
+            $this->metrics('App\\Domain', instability: 0.2, abstractness: 0.75, distance: 0.05),
+            $this->metrics('App\\Infra', instability: 0.9, abstractness: 0.1, distance: 0.0),
+            $this->metrics('App\\Shared', instability: 0.5, abstractness: 0.5, distance: 0.0),
+        ];
+        $data = new ReportData(
+            $metrics,
+            MetricsSummary::from($metrics),
+            [],
+            [['App\\Domain', 'App\\Infra']],
+        );
+
+        $output = (new MermaidReporter())->render($data);
+
+        self::assertStringContainsString('"App\\Domain [cycle] (D=0.05)":::cycle: [0.2, 0.75]', $output);
+        self::assertStringContainsString('"App\\Infra [cycle] (D=0.00)":::cycle: [0.9, 0.1]', $output);
+        self::assertStringContainsString('"App\\Shared (D=0.00)": [0.5, 0.5]', $output);
+        self::assertStringContainsString(
+            'classDef cycle color: #b42318, radius: 9, stroke-color: #7a271a, stroke-width: 3px',
+            $output,
+        );
+    }
+
+    public function testOmitsCycleStyleWhenThereAreNoCyclePoints(): void
+    {
+        $metrics = [
+            $this->metrics('App\\Domain', instability: 0.2, abstractness: 0.75, distance: 0.05),
+        ];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $output = (new MermaidReporter())->render($data);
+
+        self::assertStringNotContainsString('[cycle]', $output);
+        self::assertStringNotContainsString('classDef cycle', $output);
+    }
+
     public function testOmitsComponentsWithUnavailableDependencyMetrics(): void
     {
         $metrics = [

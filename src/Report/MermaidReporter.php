@@ -43,26 +43,44 @@ final class MermaidReporter implements ReporterInterface
             $data->componentMetrics,
             static fn (ComponentMetrics $metrics): bool => $metrics->dependencyMetricsEvaluable,
         ));
+        $cycleComponents = [];
+        foreach ($data->cycles as $cycle) {
+            foreach ($cycle as $component) {
+                $cycleComponents[$component] = true;
+            }
+        }
+        $hasCyclePoints = false;
         foreach ($evaluableMetrics as $metrics) {
-            $lines[] = $this->pointLine($metrics);
+            $inCycle = isset($cycleComponents[$metrics->component->name]);
+            $lines[] = $this->pointLine($metrics, $inCycle);
+            $hasCyclePoints = $hasCyclePoints || $inCycle;
         }
         if ($evaluableMetrics === []) {
             $lines[] = '    %% No components with evaluable dependency metrics';
+        }
+        if ($hasCyclePoints) {
+            $lines[] = '    classDef cycle color: #b42318, radius: 9, stroke-color: #7a271a, stroke-width: 3px';
         }
 
         return implode("\n", $lines);
     }
 
-    private function pointLine(ComponentMetrics $metrics): string
+    private function pointLine(ComponentMetrics $metrics, bool $inCycle): string
     {
         // コンポーネント名（FQCN の名前空間部分）に含まれる `\` はそのまま使う。
         // Mermaid の quadrantChart のラベル文字列はバックスラッシュを特殊文字として
         // 解釈しないため、エスケープなしでそのまま書ける。
-        $label = sprintf('%s (D=%.2f)', $metrics->component->name, $metrics->distance);
+        $label = sprintf(
+            '%s%s (D=%.2f)',
+            $metrics->component->name,
+            $inCycle ? ' [cycle]' : '',
+            $metrics->distance,
+        );
 
         return sprintf(
-            '    "%s": [%s, %s]',
+            '    "%s"%s: [%s, %s]',
             $label,
+            $inCycle ? ':::cycle' : '',
             $this->formatCoordinate($metrics->instability),
             $this->formatCoordinate($metrics->abstractness),
         );
