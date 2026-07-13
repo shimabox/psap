@@ -124,7 +124,7 @@ final class HtmlReporter implements ReporterInterface
 
     .summary {
       display: grid;
-      grid-template-columns: repeat(3, minmax(88px, 1fr));
+      grid-template-columns: repeat(4, minmax(88px, 1fr));
       margin: 0;
       padding: 0;
       border: 1px solid var(--grid);
@@ -147,6 +147,7 @@ final class HtmlReporter implements ReporterInterface
       font-size: 1.25rem;
       font-weight: 700;
     }
+    .summary dd.has-cycles { color: var(--pain); }
 
     .toolbar {
       display: grid;
@@ -373,6 +374,87 @@ final class HtmlReporter implements ReporterInterface
       overflow-wrap: anywhere;
     }
 
+    .cycle-notice {
+      margin: 16px 0 0;
+      border-left: 4px solid var(--pain);
+      background: rgb(181 75 53 / 8%);
+      padding: 12px 14px;
+    }
+    .cycle-notice strong { display: block; color: var(--pain); }
+    .cycle-notice p { margin: 4px 0 10px; font-size: .8rem; }
+    .cycle-link {
+      border: 0;
+      border-bottom: 1px solid currentColor;
+      background: transparent;
+      color: var(--pain);
+      padding: 0;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .cycle-panel {
+      margin-top: 18px;
+      border: 1px solid rgb(181 75 53 / 45%);
+      border-top: 5px solid var(--pain);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .cycle-panel[hidden] { display: none; }
+    .cycle-header { padding: 22px 24px 18px; }
+    .cycle-header .eyebrow { color: var(--pain); }
+    .cycle-header h2 {
+      margin: 0;
+      font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+      font-size: clamp(1.55rem, 3vw, 2.2rem);
+      font-weight: 600;
+    }
+    .cycle-header p:last-child { max-width: 780px; margin: 8px 0 0; color: var(--muted); }
+    .cycle-group { border-top: 1px solid var(--grid); }
+    .cycle-group > summary {
+      padding: 16px 24px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .cycle-group[open] > summary { background: rgb(181 75 53 / 6%); }
+    .cycle-body { padding: 4px 24px 24px; }
+    .cycle-label {
+      margin: 18px 0 6px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .cycle-path, .cycle-components { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .cycle-path code, .cycle-components code {
+      border: 1px solid var(--grid);
+      background: #f7fafc;
+      padding: 4px 7px;
+      overflow-wrap: anywhere;
+    }
+    .cycle-arrow { color: var(--pain); font-weight: 700; }
+    .dependency-edge { margin-top: 12px; border: 1px solid var(--grid); }
+    .dependency-edge h3 {
+      margin: 0;
+      background: #f7fafc;
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .8rem;
+      overflow-wrap: anywhere;
+    }
+    .class-dependency { padding: 11px 12px; border-top: 1px solid var(--grid); }
+    .class-dependency > code { display: block; overflow-wrap: anywhere; }
+    .evidence-list {
+      max-height: 180px;
+      margin: 7px 0 0;
+      padding-left: 20px;
+      color: var(--muted);
+      font-size: .74rem;
+      overflow: auto;
+    }
+    .evidence-list code { color: var(--ink); overflow-wrap: anywhere; }
+
     .table-panel {
       margin-top: 18px;
       border: 1px solid var(--grid);
@@ -428,7 +510,10 @@ final class HtmlReporter implements ReporterInterface
     @media (max-width: 580px) {
       .shell { width: min(100% - 20px, 1500px); padding-top: 24px; }
       .toolbar { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: repeat(2, minmax(88px, 1fr)); }
       .summary div { padding: 10px; }
+      .summary div:nth-child(3) { border-top: 1px solid var(--grid); border-left: 0; }
+      .summary div:nth-child(4) { border-top: 1px solid var(--grid); }
       .plot-panel { padding: 8px; }
       #ia-chart { min-height: 340px; }
     }
@@ -447,7 +532,7 @@ final class HtmlReporter implements ReporterInterface
     <header class="masthead">
       <div>
         <p class="eyebrow" data-i18n="eyebrow">psap / architecture inspection board</p>
-        <h1 data-i18n="headline">Instability meets abstraction.</h1>
+        <h1 data-i18n="headline">Instability / Abstractness Analysis</h1>
         <p class="dek" data-i18n="description">Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.</p>
       </div>
       <div class="masthead-side">
@@ -462,6 +547,7 @@ final class HtmlReporter implements ReporterInterface
           <div><dt data-i18n="components">Components</dt><dd id="summary-components">—</dd></div>
           <div><dt data-i18n="plotted">Plotted</dt><dd id="summary-plotted">—</dd></div>
           <div><dt data-i18n="meanDistance">Mean D</dt><dd id="summary-distance">—</dd></div>
+          <div><dt data-i18n="cycleGroups">Cycle groups</dt><dd id="summary-cycles">—</dd></div>
         </dl>
       </div>
     </header>
@@ -554,6 +640,15 @@ final class HtmlReporter implements ReporterInterface
         <tbody id="component-rows"></tbody>
       </table>
     </section>
+
+    <section id="cycle-panel" class="cycle-panel" aria-labelledby="cycle-heading" hidden>
+      <header class="cycle-header">
+        <p class="eyebrow" data-i18n="adpViolation">ADP violation</p>
+        <h2 id="cycle-heading" data-i18n="cycleHeading">Circular dependencies detected</h2>
+        <p data-i18n="cycleIntro">Each group shows one representative shortest path and the class-level evidence that creates its component dependencies.</p>
+      </header>
+      <div id="cycle-groups"></div>
+    </section>
   </main>
 
   <script id="psap-data" type="application/json">__PSAP_DATA__</script>
@@ -565,13 +660,31 @@ final class HtmlReporter implements ReporterInterface
         en: {
           documentTitle: 'psap — Interactive I/A report',
           eyebrow: 'psap / architecture inspection board',
-          headline: 'Instability meets abstraction.',
+          headline: 'Instability / Abstractness Analysis',
           description: 'Each point is a namespace component. Hover for its SAP metrics; select it to inspect the classes gathered beneath that point.',
           language: 'Language',
           analysisSummary: 'Analysis summary',
           components: 'Components',
           plotted: 'Plotted',
           meanDistance: 'Mean D',
+          cycleGroups: 'Cycle groups',
+          adpViolation: 'ADP violation',
+          cycleHeading: 'Circular dependencies detected',
+          cycleIntro: 'Each group shows one representative shortest path and the class-level evidence that creates its component dependencies.',
+          cycleGroupSummary: 'Cycle {number} · {count} components · {relation}',
+          hierarchicalNamespaces: 'hierarchical namespaces',
+          peerNamespaces: 'peer namespaces',
+          representativePath: 'Representative shortest path',
+          involvedComponents: 'Components in this cycle',
+          omittedFromPath: 'Not shown in the representative path',
+          dependencyEvidence: 'Dependency evidence',
+          noClassDependencies: 'No class dependencies were recorded for this edge.',
+          noSourceEvidence: 'No source-location evidence was recorded.',
+          evidenceAt: '{kind} at {file}:{line}',
+          componentInCycle: 'Part of 1 cycle group',
+          componentInCycles: 'Part of {count} cycle groups',
+          cycleInspectorText: 'This component participates in a circular dependency.',
+          showCycleDetails: 'Show cycle details',
           graphFilters: 'Graph filters',
           findComponent: 'Find a component or class',
           searchPlaceholder: 'e.g. Domain or UserRepository',
@@ -629,13 +742,31 @@ final class HtmlReporter implements ReporterInterface
         ja: {
           documentTitle: 'psap — 対話型I/Aレポート',
           eyebrow: 'psap / architecture inspection board',
-          headline: 'Instability meets abstraction.',
+          headline: 'Instability / Abstractness Analysis',
           description: '各点は名前空間コンポーネントを表します。マウスを重ねるとSAP指標を、選択するとその点に含まれるクラスを確認できます。',
           language: '表示言語',
           analysisSummary: '解析概要',
           components: 'コンポーネント',
           plotted: 'プロット',
           meanDistance: '平均D',
+          cycleGroups: '循環グループ',
+          adpViolation: 'ADP違反',
+          cycleHeading: '循環依存が検出されました',
+          cycleIntro: '各グループには代表となる最短経路と、コンポーネント間依存を生むクラス単位の根拠を表示します。',
+          cycleGroupSummary: '循環 {number} · {count}コンポーネント · {relation}',
+          hierarchicalNamespaces: '親子関係の名前空間',
+          peerNamespaces: '並列関係の名前空間',
+          representativePath: '代表となる最短経路',
+          involvedComponents: 'この循環に含まれるコンポーネント',
+          omittedFromPath: '代表経路に含まれないコンポーネント',
+          dependencyEvidence: '依存の根拠',
+          noClassDependencies: 'この辺にはクラス単位の依存が記録されていません。',
+          noSourceEvidence: 'ソース位置の根拠は記録されていません。',
+          evidenceAt: '{kind}（{file}:{line}）',
+          componentInCycle: '1件の循環グループに含まれます',
+          componentInCycles: '{count}件の循環グループに含まれます',
+          cycleInspectorText: 'このコンポーネントは循環依存に関与しています。',
+          showCycleDetails: '循環の詳細を表示',
           graphFilters: 'グラフの絞り込み',
           findComponent: 'コンポーネントまたはクラスを検索',
           searchPlaceholder: '例: Domain、UserRepository',
@@ -706,6 +837,8 @@ final class HtmlReporter implements ReporterInterface
       const distanceOutput = document.getElementById('distance-output');
       const resultCount = document.getElementById('result-count');
       const language = document.getElementById('language');
+      const cyclePanel = document.getElementById('cycle-panel');
+      const cycleGroups = document.getElementById('cycle-groups');
       const plot = { left: 70, top: 30, size: 540 };
       let locale = 'en';
       let selected = null;
@@ -715,6 +848,9 @@ final class HtmlReporter implements ReporterInterface
       document.getElementById('summary-components').textContent = String(report.summary.componentCount);
       document.getElementById('summary-plotted').textContent = String(evaluable.length);
       document.getElementById('summary-distance').textContent = report.summary.meanDistance === null ? 'N/A' : report.summary.meanDistance.toFixed(2);
+      const summaryCycles = document.getElementById('summary-cycles');
+      summaryCycles.textContent = String(report.summary.cycleGroupCount);
+      summaryCycles.classList.toggle('has-cycles', report.summary.cycleGroupCount > 0);
 
       function t(key, values = {}) {
         return messages[locale][key].replace(/\{(\w+)\}/g, (match, name) => Object.hasOwn(values, name) ? String(values[name]) : match);
@@ -733,6 +869,7 @@ final class HtmlReporter implements ReporterInterface
           element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
         });
         update();
+        renderCycles();
         if (selected) renderInspector(selected, selectedGroup);
       }
 
@@ -908,11 +1045,118 @@ final class HtmlReporter implements ReporterInterface
         parent.append(wrapper);
       }
 
+      function appendCodeList(parent, values) {
+        values.forEach((item, index) => {
+          if (index > 0) appendTextElement(parent, 'span', '→', 'cycle-arrow');
+          appendTextElement(parent, 'code', item);
+        });
+      }
+
+      function renderCycles() {
+        cyclePanel.hidden = report.cycles.length === 0;
+        cycleGroups.replaceChildren();
+        report.cycles.forEach((cycle, index) => {
+          const details = document.createElement('details');
+          details.id = `cycle-group-${index}`;
+          details.className = 'cycle-group';
+
+          const relation = cycle.namespaceRelation === 'hierarchical'
+            ? t('hierarchicalNamespaces')
+            : t('peerNamespaces');
+          appendTextElement(details, 'summary', t('cycleGroupSummary', {
+            number: index + 1,
+            count: cycle.componentCount,
+            relation,
+          }));
+
+          const body = document.createElement('div');
+          body.className = 'cycle-body';
+          appendTextElement(body, 'p', t('representativePath'), 'cycle-label');
+          const path = document.createElement('div');
+          path.className = 'cycle-path';
+          appendCodeList(path, cycle.representativePath);
+          body.append(path);
+
+          appendTextElement(body, 'p', t('involvedComponents'), 'cycle-label');
+          const components = document.createElement('div');
+          components.className = 'cycle-components';
+          cycle.components.forEach((name) => appendTextElement(components, 'code', name));
+          body.append(components);
+
+          if (cycle.omittedComponents.length > 0) {
+            appendTextElement(body, 'p', t('omittedFromPath'), 'cycle-label');
+            const omitted = document.createElement('div');
+            omitted.className = 'cycle-components';
+            cycle.omittedComponents.forEach((name) => appendTextElement(omitted, 'code', name));
+            body.append(omitted);
+          }
+
+          appendTextElement(body, 'p', t('dependencyEvidence'), 'cycle-label');
+          cycle.dependencies.forEach((dependency) => {
+            const edge = document.createElement('section');
+            edge.className = 'dependency-edge';
+            appendTextElement(edge, 'h3', `${dependency.from} → ${dependency.to}`);
+            if (dependency.classDependencies.length === 0) {
+              appendTextElement(edge, 'p', t('noClassDependencies'), 'class-dependency');
+            } else {
+              dependency.classDependencies.forEach((classDependency) => {
+                const item = document.createElement('div');
+                item.className = 'class-dependency';
+                appendTextElement(item, 'code', `${classDependency.from} → ${classDependency.to}`);
+                if (classDependency.evidence.length === 0) {
+                  appendTextElement(item, 'p', t('noSourceEvidence'));
+                } else {
+                  const evidenceList = document.createElement('ul');
+                  evidenceList.className = 'evidence-list';
+                  classDependency.evidence.forEach((evidence) => {
+                    const entry = document.createElement('li');
+                    appendTextElement(entry, 'code', t('evidenceAt', evidence));
+                    evidenceList.append(entry);
+                  });
+                  item.append(evidenceList);
+                }
+                edge.append(item);
+              });
+            }
+            body.append(edge);
+          });
+
+          details.append(body);
+          cycleGroups.append(details);
+        });
+      }
+
+      function focusCycle(index) {
+        const details = document.getElementById(`cycle-group-${index}`);
+        if (!details) return;
+        details.open = true;
+        details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        details.querySelector('summary').focus({ preventScroll: true });
+      }
+
       function renderInspector(component, coordinateGroup = [component]) {
         inspector.replaceChildren();
         appendTextElement(inspector, 'p', t('selectedComponent'), 'eyebrow');
         appendTextElement(inspector, 'h2', component.name);
         appendTextElement(inspector, 'p', t('typesAndZone', { count: component.classCount, zone: zoneName(component.zone) }));
+
+        const componentCycles = report.cycles
+          .map((cycle, index) => ({ cycle, index }))
+          .filter(({ cycle }) => cycle.components.includes(component.name));
+        if (componentCycles.length > 0) {
+          const notice = document.createElement('div');
+          notice.className = 'cycle-notice';
+          appendTextElement(
+            notice,
+            'strong',
+            t(componentCycles.length === 1 ? 'componentInCycle' : 'componentInCycles', { count: componentCycles.length }),
+          );
+          appendTextElement(notice, 'p', t('cycleInspectorText'));
+          const button = appendTextElement(notice, 'button', t('showCycleDetails'), 'cycle-link');
+          button.type = 'button';
+          button.addEventListener('click', () => focusCycle(componentCycles[0].index));
+          inspector.append(notice);
+        }
 
         const metrics = document.createElement('dl');
         metrics.className = 'metric-grid';
@@ -1053,7 +1297,7 @@ HTML);
 
     /**
      * @return array{
-     *     summary: array{componentCount: int, meanDistance: float|null},
+     *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
      *     components: list<array{
      *         name: string,
      *         classCount: int,
@@ -1065,6 +1309,22 @@ HTML);
      *         distance: float|null,
      *         zone: 'pain'|'useless'|null,
      *         classes: list<array{fqcn: string, kind: string}>
+     *     }>,
+     *     cycles: list<array{
+     *         components: list<string>,
+     *         componentCount: int,
+     *         namespaceRelation: 'hierarchical'|'peer',
+     *         representativePath: list<string>,
+     *         omittedComponents: list<string>,
+     *         dependencies: list<array{
+     *             from: string,
+     *             to: string,
+     *             classDependencies: list<array{
+     *                 from: string,
+     *                 to: string,
+     *                 evidence: list<array{kind: string, file: string, line: int}>
+     *             }>
+     *         }>
      *     }>
      * }
      */
@@ -1074,8 +1334,10 @@ HTML);
             'summary' => [
                 'componentCount' => count($data->componentMetrics),
                 'meanDistance' => $data->summary->meanDistance === null ? null : round($data->summary->meanDistance, 4),
+                'cycleGroupCount' => count($data->cycles),
             ],
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
+            'cycles' => $data->cycleGroups(),
         ];
     }
 
