@@ -15,6 +15,92 @@ docker build -t psap --target dist -f psap/docker/Dockerfile psap
 docker run --rm -v "$PWD":/workdir psap analyze src/
 ```
 
+### Dockerで解析対象と出力先を指定する
+
+Dockerでは、ホスト側のディレクトリをコンテナ内のパスへ割り当てます。次のコマンドでは、現在のディレクトリをコンテナ内の`/workdir`として見せています。
+
+```bash
+docker run --rm \
+  -v "$PWD":/workdir \
+  psap \
+  analyze src/ \
+  --format markdown \
+  --output psap-report.md
+```
+
+各指定の意味は次のとおりです。
+
+| 指定 | 意味 |
+|---|---|
+| `"$PWD"` | コマンドを実行しているホスト側のディレクトリ |
+| `/workdir` | そのディレクトリをコンテナ内で参照するためのパス |
+| `psap` | 実行するDockerイメージ名。解析対象のパスではない |
+| `analyze src/` | コンテナ内の`/workdir/src/`を解析する |
+| `--output psap-report.md` | コンテナ内の`/workdir/psap-report.md`へ出力する |
+
+psapイメージの作業ディレクトリは`/workdir`です。そのため、`src/`や`psap-report.md`のような相対パスは`/workdir`を基準に解決されます。`/workdir`は`"$PWD"`からマウントされているため、結果はホスト側の`$PWD/psap-report.md`に残ります。
+
+たとえば、ホスト側のプロジェクトが`/path/to/project`にある場合は、次の対応になります。
+
+| ホスト側 | コンテナ内 |
+|---|---|
+| `/path/to/project` | `/workdir` |
+| `/path/to/project/src` | `/workdir/src` |
+| `/path/to/project/psap-report.md` | `/workdir/psap-report.md` |
+
+#### `/path/to/dir`全体を解析する
+
+現在いるディレクトリに関係なく、解析したい場所を絶対パスで指定できます。
+
+```bash
+docker run --rm \
+  -v "/path/to/dir":/workdir \
+  psap \
+  analyze . \
+  --format markdown \
+  --output psap-report.md
+```
+
+`analyze .`は、マウント先の`/workdir`全体を解析します。結果はホスト側の`/path/to/dir/psap-report.md`へ出力されます。
+
+プロジェクト全体ではなく`/path/to/project/src`だけを解析する場合は、プロジェクトをマウントして`analyze src/`を指定します。
+
+```bash
+docker run --rm \
+  -v "/path/to/project":/workdir \
+  psap \
+  analyze src/ \
+  --format html \
+  --output psap-report.html
+```
+
+#### 出力先を別のディレクトリにする
+
+解析対象と出力先を別々にマウントします。解析対象を`:ro`で読み取り専用にすると、psapがソースディレクトリへ書き込まないことも明示できます。
+
+```bash
+mkdir -p "/path/to/reports"
+docker run --rm \
+  -v "/path/to/dir":/target:ro \
+  -v "/path/to/reports":/reports \
+  psap \
+  analyze /target \
+  --format markdown \
+  --output /reports/psap-report.md
+```
+
+この場合の対応は次のとおりです。
+
+| 用途 | ホスト側 | コンテナ内 |
+|---|---|---|
+| 解析対象 | `/path/to/dir` | `/target` |
+| 出力先 | `/path/to/reports` | `/reports` |
+| 生成されるファイル | `/path/to/reports/psap-report.md` | `/reports/psap-report.md` |
+
+`--output`で指定したコンテナ内の場所がホスト側へマウントされていない場合、`docker run --rm`の終了時に生成ファイルもコンテナと一緒に削除されます。結果を残すには、上記の`/workdir`または`/reports`のように、出力先を必ずホスト側のディレクトリへマウントしてください。
+
+### 複数のディレクトリを解析する
+
 複数のディレクトリをまとめて解析できます。
 
 ```bash
@@ -67,7 +153,7 @@ psap analyze <paths>... [options]
 
 ## 入力ファイルの文字コード
 
-PHPソースはUTF-8として解析します。UTF-8として解釈できないファイルは、クラス名などの識別子を誤って変換しないようにスキップし、対象パス、不正なバイト列を含む最初の行番号、対処方法を標準エラーへ表示します。text、Markdown、JSON、HTML形式ではレポート内のWarningsにも記録されます。
+PHPソースはUTF-8として解析します。UTF-8として解釈できないファイルは、クラス名などの識別子を誤って変換しないようにスキップし、対象パス、不正なバイト列を含む最初の行番号、対処方法を標準エラーへ表示します。text、Markdown、JSON、HTML形式ではレポート内の診断欄にも記録されます。
 
 警告されたファイルはUTF-8へ変換するか、アプリケーションのクラス構造を見るうえで不要なfixtureや生成データであれば`--exclude`で解析対象から除外してください。
 
