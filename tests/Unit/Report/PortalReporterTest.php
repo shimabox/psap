@@ -58,6 +58,8 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('copied = selectAndCopy(button.dataset.copy)', $output);
         self::assertStringContainsString("document.execCommand('copy') === true", $output);
         self::assertStringContainsString("button.textContent = copied ? t('copied') : t('copyManual')", $output);
+        // 復帰ラベルは復帰時点の locale で解決する（言語切替中に旧言語で固定しない）
+        self::assertStringContainsString("setTimeout(() => { button.textContent = t('copy'); }", $output);
         // コピーできなかった場合の i18n 文言が両言語にある
         self::assertStringContainsString("copyManual: 'Selected — press Ctrl/Cmd+C'", $output);
         self::assertStringContainsString("copyManual: '選択しました。Ctrl/Cmd+C でコピー'", $output);

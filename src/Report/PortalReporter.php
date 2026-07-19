@@ -886,9 +886,10 @@ final class PortalReporter implements ReporterInterface
             // and try execCommand. Only report success when the copy actually happened.
             copied = selectAndCopy(button.dataset.copy);
           }
-          const original = t('copy');
           button.textContent = copied ? t('copied') : t('copyManual');
-          setTimeout(() => { button.textContent = original; }, copied ? 1200 : 2500);
+          // Resolve the restored label at restore time so a language switch during
+          // the transient window leaves the button in the current locale.
+          setTimeout(() => { button.textContent = t('copy'); }, copied ? 1200 : 2500);
         });
       });
 
