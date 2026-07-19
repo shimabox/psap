@@ -9,6 +9,8 @@ psap (PHP SAP) is a CLI that statically analyzes PHP codebases and measures Clea
 
 設計が変更しづらくなっている場所、依存が集中している場所、循環依存の原因を見つけるために使います。解析はローカルで完結し、外部サービスへソースコードを送りません。
 
+psap自身を解析した[ポータルのデモ](https://shimabox.github.io/psap/)を公開しています。
+
 ## 分かること
 
 - 名前空間ごとの安定度と抽象度
