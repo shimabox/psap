@@ -34,7 +34,9 @@ final class PortalReporterTest extends TestCase
         self::assertStringStartsWith('<!doctype html>', $output);
         self::assertStringContainsString('<title>psap — SAP Analysis Report</title>', $output);
         self::assertStringContainsString('<h1 data-i18n="headline">SAP Analysis Report</h1>', $output);
-        self::assertStringContainsString("headline: 'SAP解析レポート'", $output);
+        // タイトル・見出しの固有名は翻訳しない（ja 辞書でも英語のまま）
+        self::assertStringContainsString("documentTitle: 'psap — SAP Analysis Report'", $output);
+        self::assertSame(2, substr_count($output, "headline: 'SAP Analysis Report'"));
         self::assertStringContainsString('Content-Security-Policy', $output);
         // タブ / 各セクションが揃っている
         self::assertStringContainsString('id="panel-overview"', $output);
