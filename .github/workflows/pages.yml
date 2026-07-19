@@ -1,0 +1,55 @@
+# GitHub Pages ワークフロー。
+# psap 自身の src/ を解析したポータル（--format portal）をデモとして公開する。
+# PHP 8.3 + --no-dev（本番配布相当）でビルドすることで、下限バージョン・
+# polyfill なし環境で動くことのドッグフーディングも兼ねる。
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: PHP をセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      - name: 依存関係をインストール（--no-dev）
+        run: composer install --no-dev --prefer-dist --no-progress
+
+      - name: ポータルをビルド
+        run: |
+          mkdir -p _site
+          php bin/psap analyze src/ --format portal --output _site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
