@@ -1,7 +1,9 @@
 # CI ワークフロー。
-#   checks       … PHP 8.5 で composer validate / test / stan / cs を実行
-#   self-metrics … checks 成功後、psap 自身で src/ を計測し（ドッグフーディング）、
-#                   レポートを Artifact 化 + Step Summary に表示。循環依存があれば失敗させる
+#   checks        … PHP 8.3 / 8.4 / 8.5 のマトリクスで composer validate / test / stan / cs を実行
+#   no-dev-smoke  … PHP 8.3 + composer install --no-dev（本番相当。dev 依存が持ち込む
+#                    polyfill-php84/85 に隠れて 8.3 非互換な関数が紛れ込む再発を防ぐゲート）
+#   self-metrics  … checks 成功後、psap 自身で src/ を計測し（ドッグフーディング）、
+#                    レポートを Artifact 化 + Step Summary に表示。循環依存があれば失敗させる
 name: CI
 
 on:
@@ -11,8 +13,11 @@ on:
 
 jobs:
   checks:
-    name: checks (PHP 8.5)
+    name: checks (PHP ${{ matrix.php-version }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ["8.3", "8.4", "8.5"]
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -22,7 +27,7 @@ jobs:
       - name: PHP をセットアップ
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.5"
+          php-version: ${{ matrix.php-version }}
           coverage: none
 
       - name: composer.json / composer.lock を検証
@@ -33,9 +38,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: ${{ runner.os }}-php8.5-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-php${{ matrix.php-version }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php8.5-composer-
+            ${{ runner.os }}-php${{ matrix.php-version }}-composer-
 
       - name: 依存関係をインストール
         run: composer install --prefer-dist --no-progress
@@ -48,6 +53,48 @@ jobs:
 
       - name: コーディングスタイルをチェック（php-cs-fixer dry-run）
         run: composer cs
+
+  no-dev-smoke:
+    name: no-dev smoke (PHP 8.3, --no-dev)
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: PHP をセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      # --no-dev の vendor は checks ジョブ（dev 込み）と内容が異なるため、
+      # キャッシュキーを分ける（-nodev- を含める）
+      - name: Composer パッケージをキャッシュ
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php8.3-nodev-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php8.3-nodev-composer-
+
+      # dev 依存（symfony/polyfill-php84, polyfill-php85 等）を含まない、
+      # 本番配布相当の vendor で動作確認する
+      - name: 依存関係をインストール（--no-dev）
+        run: composer install --no-dev --prefer-dist --no-progress
+
+      - name: スモークテスト用ディレクトリを用意
+        run: mkdir -p /tmp/psap-nodev-smoke
+
+      - name: 自己計測（text）
+        run: php bin/psap analyze src/ --format text
+
+      # 循環依存ベースラインの生成→読み込みを一往復させ、
+      # ベースライン読み込み経路（polyfill 隠れ依存の主因だった箇所）を通す
+      - name: 循環依存ベースラインを生成
+        run: php bin/psap analyze src/ --generate-cycle-baseline /tmp/psap-nodev-smoke/cycle-baseline.json
+
+      - name: 循環依存ベースラインを読み込んで比較
+        run: php bin/psap analyze src/ --cycle-baseline /tmp/psap-nodev-smoke/cycle-baseline.json --fail-on-cycle
 
   self-metrics:
     name: self-metrics（psap で psap を計測）

@@ -46,15 +46,14 @@ final readonly class ClassInfo
         }
         $this->dependencyEvidence = array_values($evidenceByKey);
 
-        $this->dependencies = [...$dependencies, ...array_map(
+        $combinedDependencies = [...$dependencies, ...array_map(
             static fn (DependencyEvidence $evidence): string => $evidence->targetFqcn,
             $this->dependencyEvidence,
-        )]
-            |> (fn (array $items): array => array_filter(
-                $items,
-                fn (string $dependency): bool => strcasecmp($dependency, $this->fqcn) !== 0,
-            ))
-            |> array_unique(...)
-            |> array_values(...);
+        )];
+        $filteredDependencies = array_filter(
+            $combinedDependencies,
+            fn (string $dependency): bool => strcasecmp($dependency, $this->fqcn) !== 0,
+        );
+        $this->dependencies = array_values(array_unique($filteredDependencies));
     }
 }

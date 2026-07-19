@@ -15,7 +15,7 @@ make build-dist
 make build-plantuml
 ```
 
-このリポジトリのCIはPHP 8.5でテスト、PHPStan、PHP CS Fixerを実行します。続いてpsap自身を解析し、各形式のレポートをArtifactとStep Summaryへ出力します。
+このリポジトリのCIはPHP 8.3 / 8.4 / 8.5のマトリクスでテスト、PHPStan、PHP CS Fixerを実行します。続いてpsap自身を解析し、各形式のレポートをArtifactとStep Summaryへ出力します。
 
 ## 処理の流れ
 

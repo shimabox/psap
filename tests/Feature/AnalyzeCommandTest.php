@@ -523,7 +523,7 @@ final class AnalyzeCommandTest extends TestCase
         if ($path === []) {
             self::fail('循環経路が空です。');
         }
-        self::assertSame($path[0], array_last($path));
+        self::assertSame($path[0], $path[array_key_last($path)]);
         self::assertNotEmpty($decoded['dependencies']);
         self::assertNotEmpty($decoded['dependencies'][0]['classDependencies']);
         $evidence = $decoded['dependencies'][0]['classDependencies'][0]['evidence'];

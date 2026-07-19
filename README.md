@@ -178,7 +178,7 @@ docker run --rm -v "$PWD":/workdir psap \
 - [CIでの利用](docs/ci.md)
 - [開発](docs/development.md)
 
-PHP 8.5以降が必要です。Dockerを使う場合、ホスト側のPHPは不要です。
+PHP 8.3以降が必要です。Dockerを使う場合、ホスト側のPHPは不要です。
 
 ## ライセンス
 

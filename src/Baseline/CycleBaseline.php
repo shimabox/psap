@@ -159,16 +159,32 @@ final readonly class CycleBaseline
 
     private static function isStringList(mixed $value): bool
     {
-        return is_array($value)
-            && array_is_list($value)
-            && array_all($value, static fn (mixed $item): bool => is_string($item));
+        if (!is_array($value) || !array_is_list($value)) {
+            return false;
+        }
+
+        foreach ($value as $item) {
+            if (!is_string($item)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function isCycleList(mixed $value): bool
     {
-        return is_array($value)
-            && array_is_list($value)
-            && array_all($value, static fn (mixed $cycle): bool => self::isCycle($cycle));
+        if (!is_array($value) || !array_is_list($value)) {
+            return false;
+        }
+
+        foreach ($value as $cycle) {
+            if (!self::isCycle($cycle)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function isCycle(mixed $value): bool
