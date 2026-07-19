@@ -91,9 +91,6 @@ final class MermaidReporter implements ReporterInterface
         $clamped = max(self::CLAMP_MIN, min(self::CLAMP_MAX, $value));
 
         // 末尾の 0 を除去して見た目をシンプルにする（0.20 → 0.2、0.90 → 0.9 等）
-        return $clamped
-            |> (static fn (float $coordinate): string => sprintf('%.2f', $coordinate))
-            |> (static fn (string $coordinate): string => rtrim($coordinate, '0'))
-            |> (static fn (string $coordinate): string => rtrim($coordinate, '.'));
+        return rtrim(rtrim(sprintf('%.2f', $clamped), '0'), '.');
     }
 }

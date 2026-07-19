@@ -127,7 +127,7 @@ composer require --dev shimabox/psap:dev-main
 vendor/bin/psap analyze src/
 ```
 
-PHP 8.5以降が必要です。
+PHP 8.3以降が必要です。
 
 ## コマンド
 
