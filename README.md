@@ -81,9 +81,9 @@ docker run --rm -v "$PWD":/workdir psap \
   analyze src/ --format portal --output psap-portal.html
 ```
 
-`psap-portal.html`をブラウザで開くと、Overview・Interactive I/A・Diagrams・Cycles・Sourcesのタブを切り替えられます。Diagramsタブの`quadrantChart`と依存フローチャートは、同梱したMermaidがブラウザ内で描画するため、追加ツールなしにその場で図として確認できます。Interactive I/Aタブには前述の自己完結HTMLをそのまま埋め込んでいます。
+`psap-portal.html`をブラウザで開くと、Overview・Interactive I/A・Diagrams・Cycles・Sourcesのタブを切り替えられます。Diagramsタブの`quadrantChart`と依存フローチャートは、同梱したMermaidがブラウザ内で描画するため、追加ツールなしにその場で図として確認できます。図は`+`/`−`/Resetボタン、Ctrl/Cmd+スクロール、ドラッグで拡縮・移動できるので、大きなグラフでも見たい部分を拡大できます。Interactive I/Aタブには前述の自己完結HTMLをそのまま埋め込んでいます。
 
-ポータルも完全に自己完結しており、解析結果もMermaid本体もファイル内に含まれるため、オフラインで開けて外部への通信は一切発生しません。Mermaidを同梱する分、出力サイズは通常のHTMLより大きく、+3.5MB前後になります。図のソース（`.mmd` / `.puml`）はSourcesタブからコピー・ダウンロードできます。
+ポータルも完全に自己完結しており、解析結果もMermaid本体もファイル内に含まれるため、オフラインで開けて外部への通信は一切発生しません。Mermaidを同梱する分、出力サイズは通常のHTMLより大きく、+3.5MB前後になります。図のソース（`.mmd` / `.puml`）とMarkdownレポート（`psap-report.md`）は、Sourcesタブからコピー・ダウンロードできます。生成AIへ渡すMarkdownレポートも、この1ファイルからそのまま取り出せます。
 
 ![psapのポータルレポート。Diagramsタブでブラウザ内描画したI/A象限チャートと依存フローチャートを表示](docs/images/portal-report.png)
 
