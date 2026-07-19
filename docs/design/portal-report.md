@@ -195,27 +195,34 @@ HtmlReporter と同様に「テンプレート + `__PSAP_*__` プレースホル
 | iframe srcdoc のエスケープ漏れで既存レポートが壊れる | 往復エスケープのユニットテストで担保 |
 | HtmlReporter の将来変更がポータルにも波及 | srcdoc 埋め込みは無改修合成なので、HtmlReporter 単体のテストが通ればポータル側は再エスケープのみ。結合テストで検知 |
 
-## 実装前に確認する判断事項
+## 実装前に確認する判断事項（確定済み）
+
+以下 5 項目は実装時に確定した。
 
 ### 1. MermaidFlowchartReporter を `--format` として公開するか
 
-内部利用のみなら API 追加なしで済む。公開するなら既存 `mermaid`（quadrantChart）との名前整理（例: `mermaid-deps`）が必要。**推奨: PR 1 では内部のみ。要望が出たら公開**。
+**確定: 内部利用のみ**（CLI の `--format` には未公開）。実装済みで、ラベルのエスケープ表も確定した: `&`→`#38;`、`<`→`#lt;`、`>`→`#gt;`、`"`→`#quot;`。`\`（名前空間区切り）は特殊文字として解釈されないためそのまま通す。要望が出た時点で公開を検討する。
 
 ### 2. mermaid.js の更新方針
 
-固定バージョンをいつ・どう上げるか。**推奨: セキュリティ修正時のみ手動更新。自動更新はしない**。
+**確定: セキュリティ修正時のみ手動更新**。自動更新はしない。同梱バージョンは `11.16.0`（`dist/mermaid.min.js`、グローバル/IIFE ビルド、MIT）。更新時はオフラインのブラウザで Diagrams タブの描画を目視確認する。手順とバージョンは `resources/js/README.md` に記録する。
 
 ### 3. ポータルと iframe の言語切替連動
 
-初期実装では非連動とするか。**推奨: 非連動で開始。postMessage での連動は後続候補**。
+**確定: 非連動で開始**。ポータルの言語セレクターと iframe 内 HTML レポートの言語セレクターは独立して動く。postMessage での連動は後続候補とする。
 
 ### 4. 既定ファイル名の案内
 
-`--output` 省略時は標準出力（既存規約通り）だが、README の例で `psap-portal.html` を標準名として案内するか。**推奨: 案内する**。
+**確定: 案内する**。`--output` 省略時は標準出力（既存規約通り）だが、README / getting-started の例では `psap-portal.html` を標準名として案内する。
 
 ### 5. flowchart フォールバックのしきい値
 
-Mermaid 既定の maxEdges=500 に合わせるか、独自に下げるか。**推奨: 500 で開始し、実プロジェクトでの体感で調整**。
+**確定: Mermaid 既定の maxEdges=500**。エッジ数が 500 を超える場合は flowchart のクライアント描画をスキップし、ソース表示へフォールバックする（i18n 対応のメッセージ付き）。quadrantChart は点数によらず描画する。`maxTextSize` 超過に備え、mermaid の初期化で上限を引き上げる（`maxTextSize: 5000000`）。
+
+## 実装時に確定した事項
+
+- **CSP**: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; frame-src 'self' data: about:; base-uri 'none'; form-action 'none'`。iframe srcdoc（`about:srcdoc`）と同梱 mermaid の両方が動作することをブラウザで確認済み。mermaid は `Function("return this")` を `self` 参照で短絡するため `'unsafe-eval'` は不要。外部オリジンは一切許可しない。
+- **外部 URL 検査テストの除外**: 検査対象を「PortalReporter が生成するテンプレート部分」に限定する。同梱 mermaid.min.js の `<script>` ブロック、iframe srcdoc に埋め込んだ HtmlReporter 出力（独自の外部URL検査があり、SVG 名前空間 URI `http://www.w3.org/2000/svg` を含む）、mermaid ライセンスの HTML コメントを除外したうえで `http(s)://` 参照がないことを検証する。
 
 ## 推奨する着手順
 
