@@ -40,6 +40,8 @@ final class MermaidFlowchartReporterTest extends TestCase
 
         self::assertStringContainsString('C1["App\\Domain<br/>I=0.20 A=0.75 D=0.05"]', $output);
         self::assertStringContainsString('C2["App\\Infra<br/>I=0.90 A=0.10 D=0.00"]', $output);
+        // 余分なノードが出力されていないことも確認する（ノード行の出現数が componentMetrics 数と一致）
+        self::assertSame(count($metrics), preg_match_all('/^\s*C\d+\["/m', $output));
     }
 
     public function testEdgeCountMatchesDependencyGraph(): void
