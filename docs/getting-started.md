@@ -110,12 +110,14 @@ docker run --rm -v "$PWD":/workdir psap \
 
 ## PHAR
 
-リポジトリ内でPHARを作成します。
+[最新リリース](https://github.com/shimabox/psap/releases/latest)からpsap.pharをダウンロードして実行します。
 
 ```bash
-make phar
+curl -sSLO https://github.com/shimabox/psap/releases/latest/download/psap.phar
 php psap.phar analyze src/
 ```
+
+リポジトリ内でビルドする場合は`make phar`を実行します。
 
 ## Composer
 
