@@ -171,7 +171,7 @@ psap analyze src/ --format portal --output psap-portal.html
 
 `report.html`は外部アセットを必要としないため、そのままブラウザで開けます。点を選ぶと、名前空間コンポーネントの指標と所属クラスを確認できます。
 
-`portal`は、サマリー・インタラクティブI/Aグラフ・Mermaid図・循環詳細・図ソースを1つの自己完結HTMLにまとめた入口です。標準名は`psap-portal.html`を推奨します。Diagramsタブの`quadrantChart`と依存フローチャートは、同梱したMermaidがブラウザ内で描画するため、追加ツールなしにその場で図として確認できます。図は`+`/`−`/Resetボタン、Ctrl/Cmd+スクロール、ドラッグで拡縮・移動できます。解析結果もMermaid本体もファイル内に含まれるので、オフラインで開けて外部への通信は発生しません。Mermaidを同梱する分、出力サイズは`html`より大きく、+3.5MB前後になります。依存フローチャートのエッジ数が500を超える場合は、ブラウザ内描画を省略してソース表示へフォールバックします。SourcesタブからはMermaid（`.mmd`）・PlantUML（`.puml`）の図ソースに加えて、Markdownレポート（`psap-report.md`）もコピー・ダウンロードできます。
+`portal`は、サマリー・インタラクティブI/Aグラフ・Mermaid図・循環詳細・図ソースを1つの自己完結HTMLにまとめた入口です。標準名は`psap-portal.html`を推奨します。Diagramsタブの`quadrantChart`と依存フローチャートは同梱したMermaidがブラウザ内で描画し、`+`/`−`/Resetボタン・Ctrl/Cmd+スクロール・ドラッグで拡大・移動できます。SourcesタブからはMermaid（`.mmd`）・PlantUML（`.puml`）の図ソースとMarkdownレポート（`psap-report.md`）をコピー・ダウンロードできます。解析結果もMermaidも1ファイルに収まるため外部通信は発生せず、出力サイズは`html`より大きく+3.5MB前後になります。依存フローチャートのエッジ数が500を超える場合は、ブラウザ内描画を省略してソース表示へフォールバックします。
 
 ```bash
 docker run --rm -v "$PWD":/workdir psap \
