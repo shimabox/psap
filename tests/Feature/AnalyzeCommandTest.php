@@ -152,6 +152,54 @@ final class AnalyzeCommandTest extends TestCase
         self::assertStringContainsString('Fixture\\\\App\\\\Domain', $display);
     }
 
+    public function testPortalFormatRendersRawHtmlToStdout(): void
+    {
+        $tester = $this->commandTester();
+
+        $exitCode = $tester->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'portal']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $tester->getDisplay();
+        self::assertStringStartsWith('<!doctype html>', $display);
+        self::assertStringContainsString('Content-Security-Policy', $display);
+        self::assertStringContainsString('id="panel-diagrams"', $display);
+        self::assertStringContainsString('srcdoc="', $display);
+        // 図ソースにフィクスチャのコンポーネント名（HTML エスケープ済み）が現れる
+        self::assertStringContainsString('Fixture\\\\App\\\\Domain', $display);
+    }
+
+    public function testPortalFormatWritesSelfContainedFile(): void
+    {
+        $outputPath = sys_get_temp_dir() . '/psap-portal-' . uniqid() . '.html';
+
+        try {
+            $tester = $this->commandTester();
+            $exitCode = $tester->execute([
+                'paths' => [self::CYCLIC_PROJECT],
+                '--depth' => '3',
+                '--format' => 'portal',
+                '--output' => $outputPath,
+            ]);
+
+            self::assertSame(Command::SUCCESS, $exitCode);
+            self::assertFileExists($outputPath);
+            $report = (string) file_get_contents($outputPath);
+            self::assertStringStartsWith('<!doctype html>', $report);
+            self::assertStringContainsString('globalThis["mermaid"]', $report);
+            self::assertStringContainsString('id="panel-cycles"', $report);
+            self::assertStringNotContainsString('__PSAP_', $report);
+            // 自己完結の担保: mermaid 本体（3.5MB）と iframe srcdoc を strpos で切り出して
+            // 除いた「PortalReporter が生成する部分」に外部 URL 参照がないことを確認する。
+            // `.*?` の正規表現は PCRE のバックトラック上限に達するため使わない。
+            $inspectable = $this->removeBetween($report, '<script>"use strict";var __esbuild_esm_mermaid_nm', '</script>');
+            $inspectable = $this->removeBetween($inspectable, 'srcdoc="', '"');
+            self::assertStringNotContainsString('https://', $inspectable);
+            self::assertStringNotContainsString('http://', $inspectable);
+        } finally {
+            @unlink($outputPath);
+        }
+    }
+
     public function testStructuredFormatsReportInvalidUtf8FileAndContinue(): void
     {
         $directory = sys_get_temp_dir() . '/psap-invalid-utf8-' . uniqid();
@@ -671,6 +719,16 @@ final class AnalyzeCommandTest extends TestCase
     private function temporaryBaselinePath(): string
     {
         return sys_get_temp_dir() . '/psap-cycle-baseline-' . uniqid() . '.json';
+    }
+
+    private function removeBetween(string $subject, string $startNeedle, string $endNeedle): string
+    {
+        $start = strpos($subject, $startNeedle);
+        self::assertNotFalse($start, sprintf('Marker "%s" was not found.', $startNeedle));
+        $endMarker = strpos($subject, $endNeedle, $start + strlen($startNeedle));
+        self::assertNotFalse($endMarker);
+
+        return substr($subject, 0, $start) . substr($subject, $endMarker + strlen($endNeedle));
     }
 
     /** @return JsonReport */

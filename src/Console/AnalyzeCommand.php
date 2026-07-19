@@ -26,6 +26,7 @@ use Psap\Report\JsonReporter;
 use Psap\Report\MarkdownReporter;
 use Psap\Report\MermaidReporter;
 use Psap\Report\PlantUmlReporter;
+use Psap\Report\PortalReporter;
 use Psap\Report\ReportData;
 use Psap\Report\ReporterInterface;
 use Psap\Report\TextReporter;
@@ -308,7 +309,8 @@ final class AnalyzeCommand extends Command
                 return Command::FAILURE;
             }
         } else {
-            $output->write($rendered . PHP_EOL, false, $format === 'html' ? OutputInterface::OUTPUT_RAW : OutputInterface::OUTPUT_NORMAL);
+            $rawFormat = $format === 'html' || $format === 'portal';
+            $output->write($rendered . PHP_EOL, false, $rawFormat ? OutputInterface::OUTPUT_RAW : OutputInterface::OUTPUT_NORMAL);
         }
 
         if ($threshold !== null) {
@@ -423,6 +425,7 @@ final class AnalyzeCommand extends Command
             'html' => static fn (bool $verbose): ReporterInterface => new HtmlReporter(),
             'mermaid' => static fn (bool $verbose): ReporterInterface => new MermaidReporter(),
             'plantuml' => static fn (bool $verbose): ReporterInterface => new PlantUmlReporter(),
+            'portal' => static fn (bool $verbose): ReporterInterface => new PortalReporter(),
         ];
     }
 }
