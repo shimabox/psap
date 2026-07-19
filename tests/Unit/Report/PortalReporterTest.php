@@ -105,6 +105,8 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString("zoomHint: 'Ctrl/Cmd+スクロールで拡縮、ドラッグで移動'", $output);
         // 拡縮対象は SVG の transform（ソース/テキストは変更しない）
         self::assertStringContainsString("svg.style.transformOrigin = '0 0'", $output);
+        // quadrant は素のサイズで描画（コンテナ幅いっぱいに引き伸ばさない）
+        self::assertStringContainsString('quadrantChart: { useMaxWidth: false }', $output);
     }
 
     public function testAllPlaceholdersAreSubstituted(): void

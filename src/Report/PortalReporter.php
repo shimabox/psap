@@ -967,6 +967,10 @@ final class PortalReporter implements ReporterInterface
           securityLevel: 'strict',
           maxTextSize: 5000000,
           maxEdges: 2000,
+          // Render the quadrant at its natural ~500px instead of stretching it to
+          // the container width (which makes the title, labels and points huge).
+          // The flowchart keeps the default (fills width). Both stay zoomable.
+          quadrantChart: { useMaxWidth: false },
         });
 
         drawDiagram('diagram-quadrant', 'psap-quadrant-svg', sources.quadrant);
