@@ -50,6 +50,32 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('Bundled Mermaid v11.16.0 is distributed under the MIT License', $output);
     }
 
+    public function testCopyReportsSuccessOnlyWhenClipboardActuallyWorks(): void
+    {
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        // フォールバック時は選択後に execCommand を試し、成功した場合だけ成功表示する
+        self::assertStringContainsString('copied = selectAndCopy(button.dataset.copy)', $output);
+        self::assertStringContainsString("document.execCommand('copy') === true", $output);
+        self::assertStringContainsString("button.textContent = copied ? t('copied') : t('copyManual')", $output);
+        // コピーできなかった場合の i18n 文言が両言語にある
+        self::assertStringContainsString("copyManual: 'Selected — press Ctrl/Cmd+C'", $output);
+        self::assertStringContainsString("copyManual: '選択しました。Ctrl/Cmd+C でコピー'", $output);
+    }
+
+    public function testDiagramFallbackRemembersMessageKeyForRetranslation(): void
+    {
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        // フォールバック要素はメッセージキーを data-fallback-key に記録する
+        self::assertStringContainsString('notice.dataset.fallbackKey = key', $output);
+        self::assertStringContainsString("setFallback(container, 'diagramError')", $output);
+        self::assertStringContainsString("setFallback(flowchartContainer, 'flowchartSkipped'", $output);
+        // applyLanguage は quadrant / flowchart 両方の fallback をキーに応じて再翻訳する
+        self::assertStringContainsString('.fallback[data-fallback-key]', $output);
+        self::assertStringContainsString('t(element.dataset.fallbackKey, fallbackParams(element))', $output);
+    }
+
     public function testAllPlaceholdersAreSubstituted(): void
     {
         $output = (new PortalReporter())->render($this->simpleData());
