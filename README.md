@@ -1,5 +1,10 @@
 # psap
 
+[![CI](https://github.com/shimabox/psap/actions/workflows/ci.yml/badge.svg)](https://github.com/shimabox/psap/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+psap (PHP SAP) is a CLI that statically analyzes PHP codebases and measures Clean Architecture's Stable Abstractions Principle metrics (Ca / Ce / I / A / D). It detects circular dependencies with file:line evidence and renders self-contained HTML / Mermaid / PlantUML reports. Analysis runs entirely locally — no code leaves your machine. Documentation is in Japanese.
+
 `psap`（PHP SAP）は、PHP コードベースを解析して *Clean Architecture*（Robert C. Martin 著）第14章「安定度・抽象度等価の原則（SAP: Stable Abstractions Principle）」のメトリクス（Ca / Ce / I / A / D）を計測する CLI ツールです。
 
 設計が変更しづらくなっている場所、依存が集中している場所、循環依存の原因を見つけるために使います。解析はローカルで完結し、外部サービスへソースコードを送りません。
