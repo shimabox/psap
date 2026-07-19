@@ -109,6 +109,24 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('quadrantChart: { useMaxWidth: false }', $output);
     }
 
+    public function testSourcesTabIncludesMarkdownReport(): void
+    {
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        // Markdown 用の Sources ブロック（既存の .mmd / .puml と同じ UI）
+        self::assertStringContainsString('data-i18n="markdownSource"', $output);
+        self::assertStringContainsString('<pre class="source" id="source-markdown">', $output);
+        self::assertStringContainsString('data-copy="markdown"', $output);
+        self::assertStringContainsString('data-download="markdown" data-file="psap-report.md"', $output);
+        // JS で textContent 代入する（プレースホルダは JSON 文字列に置換済み）
+        self::assertStringContainsString("document.getElementById('source-markdown').textContent = sources.markdown;", $output);
+        // Markdown レポート本文（英語のまま）が sources JSON に入る
+        self::assertStringContainsString('# psap Architecture Analysis', $output);
+        // 見出し文言が en/ja に追加されている
+        self::assertStringContainsString("markdownSource: 'Markdown report (.md)'", $output);
+        self::assertStringContainsString("markdownSource: 'Markdown レポート（.md）'", $output);
+    }
+
     public function testAllPlaceholdersAreSubstituted(): void
     {
         $output = (new PortalReporter())->render($this->simpleData());

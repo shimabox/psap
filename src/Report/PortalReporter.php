@@ -47,6 +47,7 @@ final class PortalReporter implements ReporterInterface
         $quadrant = (new MermaidReporter())->render($data);
         $flowchart = (new MermaidFlowchartReporter())->render($data);
         $plantuml = (new PlantUmlReporter())->render($data);
+        $markdown = (new MarkdownReporter())->render($data);
         $mermaidJs = $this->loadMermaidAsset();
 
         $edgeCount = count($data->dependencyGraph->edges);
@@ -60,6 +61,7 @@ final class PortalReporter implements ReporterInterface
             '__PSAP_MERMAID_QUADRANT__' => $this->encode($quadrant),
             '__PSAP_MERMAID_FLOWCHART__' => $this->encode($flowchart),
             '__PSAP_PLANTUML__' => $this->encode($plantuml),
+            '__PSAP_MARKDOWN__' => $this->encode($markdown),
             '__PSAP_MERMAID_VERSION__' => self::MERMAID_VERSION,
             '__PSAP_MERMAID_JS__' => $mermaidJs,
         ];
@@ -683,6 +685,16 @@ final class PortalReporter implements ReporterInterface
         </div>
         <pre class="source" id="source-plantuml"></pre>
       </div>
+      <div class="source-block">
+        <div class="source-head">
+          <h3 data-i18n="markdownSource">Markdown report (.md)</h3>
+          <div class="source-actions">
+            <button type="button" data-copy="markdown" data-i18n="copy">Copy</button>
+            <button type="button" data-download="markdown" data-file="psap-report.md" data-i18n="download">Download</button>
+          </div>
+        </div>
+        <pre class="source" id="source-markdown"></pre>
+      </div>
     </section>
 
     <footer>
@@ -758,10 +770,11 @@ final class PortalReporter implements ReporterInterface
           noClassDependencies: 'No class dependencies were recorded for this edge.',
           noSourceEvidence: 'No source-location evidence was recorded.',
           noCyclesFound: 'No circular dependencies (ADP violations) were detected.',
-          sourcesIntro: 'Copy or download the raw diagram sources for use in external viewers or with AI assistants.',
+          sourcesIntro: 'Copy or download the raw diagram sources and the Markdown report for use in external viewers or with AI assistants.',
           quadrantSource: 'Mermaid quadrantChart (.mmd)',
           flowchartSource: 'Mermaid flowchart (.mmd)',
           plantumlSource: 'PlantUML (.puml)',
+          markdownSource: 'Markdown report (.md)',
           copy: 'Copy',
           copied: 'Copied',
           copyManual: 'Selected — press Ctrl/Cmd+C',
@@ -824,10 +837,11 @@ final class PortalReporter implements ReporterInterface
           noClassDependencies: 'この辺にはクラス単位の依存が記録されていません。',
           noSourceEvidence: 'ソース位置の根拠は記録されていません。',
           noCyclesFound: '循環依存（ADP違反）は検出されませんでした。',
-          sourcesIntro: '図のソースをコピーまたはダウンロードして、外部ビューアやAIアシスタントで利用できます。',
+          sourcesIntro: '図のソースと Markdown レポートをコピーまたはダウンロードして、外部ビューアやAIアシスタントで利用できます。',
           quadrantSource: 'Mermaid quadrantChart（.mmd）',
           flowchartSource: 'Mermaid flowchart（.mmd）',
           plantumlSource: 'PlantUML（.puml）',
+          markdownSource: 'Markdown レポート（.md）',
           copy: 'コピー',
           copied: 'コピーしました',
           copyManual: '選択しました。Ctrl/Cmd+C でコピー',
@@ -841,6 +855,7 @@ final class PortalReporter implements ReporterInterface
         quadrant: __PSAP_MERMAID_QUADRANT__,
         flowchart: __PSAP_MERMAID_FLOWCHART__,
         plantuml: __PSAP_PLANTUML__,
+        markdown: __PSAP_MARKDOWN__,
       };
       const language = document.getElementById('language');
       let locale = 'en';
@@ -907,6 +922,7 @@ final class PortalReporter implements ReporterInterface
       document.getElementById('source-quadrant').textContent = sources.quadrant;
       document.getElementById('source-flowchart').textContent = sources.flowchart;
       document.getElementById('source-plantuml').textContent = sources.plantuml;
+      document.getElementById('source-markdown').textContent = sources.markdown;
 
       document.querySelectorAll('[data-copy]').forEach((button) => {
         button.addEventListener('click', async () => {
