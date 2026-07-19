@@ -504,6 +504,30 @@ final class PortalReporter implements ReporterInterface
       min-height: 120px;
     }
     .diagram svg { max-width: 100%; height: auto; }
+    /* A successfully-rendered diagram becomes zoomable: the container clips and
+       anchors the overlaid controls, and the inner <svg> carries the transform. */
+    .diagram.zoomable {
+      position: relative;
+      overflow: hidden;
+      padding: 0;
+      max-height: 80vh;
+      cursor: grab;
+    }
+    .diagram.zoomable.dragging { cursor: grabbing; user-select: none; }
+    .diagram.zoomable svg { max-width: none; height: auto; display: block; }
+    .zoom-controls { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; }
+    .zoom-btn {
+      min-width: 30px;
+      border: 1px solid var(--ink);
+      background: rgb(255 255 255 / 92%);
+      color: var(--ink);
+      padding: 5px 9px;
+      cursor: pointer;
+      font-size: .82rem;
+      line-height: 1.1;
+      box-shadow: 0 2px 6px rgb(24 37 47 / 12%);
+    }
+    .zoom-btn:hover { background: var(--ink); color: #fff; }
     .fallback { margin: 0; border-left: 4px solid var(--pain); background: rgb(181 75 53 / 8%); padding: 12px 14px; font-size: .84rem; }
     .cycle-group { border: 1px solid var(--grid); margin-bottom: 10px; }
     .cycle-group > summary { padding: 14px 18px; cursor: pointer; font-weight: 700; }
@@ -717,6 +741,11 @@ final class PortalReporter implements ReporterInterface
           flowchartNote: 'Components and their dependencies. Red edges are shortest cycle paths (ADP violations).',
           flowchartSkipped: 'This graph is large ({edges} edges, limit {max}), so in-browser rendering was skipped. Use the Sources tab with an external viewer, or narrow the scope with --depth or --exclude.',
           diagramError: 'The diagram could not be rendered in this browser. The source is available on the Sources tab.',
+          zoomIn: 'Zoom in',
+          zoomOut: 'Zoom out',
+          zoomReset: 'Reset',
+          zoomResetTitle: 'Reset zoom and pan',
+          zoomHint: 'Ctrl/Cmd+scroll to zoom, drag to pan',
           cyclesHeading: 'Circular dependencies',
           cyclesIntro: 'Each group shows one representative shortest path and the class-level evidence that creates its component dependencies.',
           componentsWord: 'components',
@@ -778,6 +807,11 @@ final class PortalReporter implements ReporterInterface
           flowchartNote: 'コンポーネントとその依存関係。赤いエッジは最短の循環経路（ADP違反）です。',
           flowchartSkipped: 'グラフが大きいため（{edges}エッジ、上限{max}）、ブラウザ内描画をスキップしました。「図ソース」タブのソースを外部ビューアで利用するか、--depth や --exclude で対象を絞ってください。',
           diagramError: 'この図をブラウザで描画できませんでした。ソースは「図ソース」タブで確認できます。',
+          zoomIn: '拡大',
+          zoomOut: '縮小',
+          zoomReset: 'リセット',
+          zoomResetTitle: 'ズームと位置をリセット',
+          zoomHint: 'Ctrl/Cmd+スクロールで拡縮、ドラッグで移動',
           cyclesHeading: '循環依存',
           cyclesIntro: '各グループには代表となる最短経路と、コンポーネント間依存を生むクラス単位の根拠を表示します。',
           componentsWord: 'コンポーネント',
@@ -950,9 +984,117 @@ final class PortalReporter implements ReporterInterface
         try {
           const { svg } = await mermaid.render(renderId, source);
           container.innerHTML = svg;
+          initZoomPan(container);
         } catch (error) {
           setFallback(container, 'diagramError');
         }
+      }
+
+      // Zoom/pan tuning. ZOOM_STEP is the per-click / per-wheel-tick scale factor;
+      // ZOOM_MIN / ZOOM_MAX bound how far a diagram can shrink or grow.
+      const ZOOM_STEP = 1.25;
+      const ZOOM_MIN = 0.2;
+      const ZOOM_MAX = 10;
+      const clampZoom = (scale) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
+
+      // initZoomPan makes a successfully-rendered diagram container zoomable and
+      // pannable. The scale/translate transform is applied to the inner <svg>
+      // (transform-origin 0 0), never to its text/source, so nothing here changes
+      // what mermaid rendered. Controls are localized via data-i18n so a language
+      // switch relabels them. Idempotent: a second call is a no-op.
+      function initZoomPan(container) {
+        const svg = container.querySelector('svg');
+        if (svg === null || container.querySelector('.zoom-controls') !== null) return;
+
+        container.classList.add('zoomable');
+        container.title = t('zoomHint');
+        container.dataset.i18nTitle = 'zoomHint';
+        svg.style.transformOrigin = '0 0';
+        svg.style.maxWidth = 'none';
+
+        const state = { scale: 1, x: 0, y: 0 };
+        const apply = () => {
+          svg.style.transform = 'translate(' + state.x + 'px, ' + state.y + 'px) scale(' + state.scale + ')';
+        };
+        const reset = () => { state.scale = 1; state.x = 0; state.y = 0; apply(); };
+
+        // Rescale around a viewport point (e.g. the cursor) so whatever sits under
+        // it stays under it after the scale change.
+        function zoomAt(factor, clientX, clientY) {
+          const newScale = clampZoom(state.scale * factor);
+          if (newScale === state.scale) return;
+          const rect = container.getBoundingClientRect();
+          const originX = clientX - rect.left;
+          const originY = clientY - rect.top;
+          state.x = originX - ((originX - state.x) / state.scale) * newScale;
+          state.y = originY - ((originY - state.y) / state.scale) * newScale;
+          state.scale = newScale;
+          apply();
+        }
+        function zoomAtCenter(factor) {
+          const rect = container.getBoundingClientRect();
+          zoomAt(factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
+        }
+
+        const controls = document.createElement('div');
+        controls.className = 'zoom-controls';
+        controls.append(
+          zoomButton('+', 'zoomIn', () => zoomAtCenter(ZOOM_STEP)),
+          zoomButton('−', 'zoomOut', () => zoomAtCenter(1 / ZOOM_STEP)),
+          zoomButton(t('zoomReset'), 'zoomReset', reset, 'zoomResetTitle'),
+        );
+        container.append(controls);
+
+        // Only zoom on Ctrl/Cmd+wheel; a plain wheel keeps scrolling the page.
+        container.addEventListener('wheel', (event) => {
+          if (!(event.ctrlKey || event.metaKey)) return;
+          event.preventDefault();
+          zoomAt(event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, event.clientX, event.clientY);
+        }, { passive: false });
+
+        let dragging = false;
+        let lastX = 0;
+        let lastY = 0;
+        const stopDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          container.classList.remove('dragging');
+        };
+        container.addEventListener('mousedown', (event) => {
+          if (event.button !== 0 || event.target.closest('.zoom-controls') !== null) return;
+          dragging = true;
+          lastX = event.clientX;
+          lastY = event.clientY;
+          container.classList.add('dragging');
+          event.preventDefault();
+        });
+        document.addEventListener('mousemove', (event) => {
+          if (!dragging) return;
+          state.x += event.clientX - lastX;
+          state.y += event.clientY - lastY;
+          lastX = event.clientX;
+          lastY = event.clientY;
+          apply();
+        });
+        document.addEventListener('mouseup', stopDrag);
+        window.addEventListener('blur', stopDrag);
+
+        apply();
+      }
+
+      function zoomButton(symbol, labelKey, onClick, titleKey) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'zoom-btn';
+        button.textContent = symbol;
+        // The Reset button also localizes its label; +/− keep their symbol and
+        // only localize the tooltip.
+        if (labelKey === 'zoomReset') button.dataset.i18n = labelKey;
+        const tooltipKey = titleKey ?? labelKey;
+        button.title = t(tooltipKey);
+        button.dataset.i18nTitle = tooltipKey;
+        button.addEventListener('click', onClick);
+        return button;
       }
 
       language.addEventListener('change', () => {

@@ -82,6 +82,31 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('t(element.dataset.fallbackKey, fallbackParams(element))', $output);
     }
 
+    public function testDiagramsProvideZoomAndPanControls(): void
+    {
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        // 描画成功時のみズーム/パンを有効化する（フォールバックには適用しない）
+        self::assertStringContainsString('initZoomPan(container)', $output);
+        self::assertStringContainsString('function initZoomPan(container)', $output);
+        // +/-/Reset ボタンと操作系
+        self::assertStringContainsString("controls.className = 'zoom-controls'", $output);
+        self::assertStringContainsString('.zoom-controls {', $output);
+        self::assertStringContainsString('.zoom-btn {', $output);
+        self::assertStringContainsString("zoomButton('+', 'zoomIn'", $output);
+        self::assertStringContainsString("zoomButton('−', 'zoomOut'", $output);
+        self::assertStringContainsString("zoomButton(t('zoomReset'), 'zoomReset', reset, 'zoomResetTitle')", $output);
+        // Ctrl/Cmd+ホイールでのみズーム、それ以外はページスクロールを妨げない
+        self::assertStringContainsString('if (!(event.ctrlKey || event.metaKey)) return;', $output);
+        // ズーム/パン用の文言が en/ja に追加されている
+        self::assertStringContainsString("zoomReset: 'Reset'", $output);
+        self::assertStringContainsString("zoomReset: 'リセット'", $output);
+        self::assertStringContainsString("zoomHint: 'Ctrl/Cmd+scroll to zoom, drag to pan'", $output);
+        self::assertStringContainsString("zoomHint: 'Ctrl/Cmd+スクロールで拡縮、ドラッグで移動'", $output);
+        // 拡縮対象は SVG の transform（ソース/テキストは変更しない）
+        self::assertStringContainsString("svg.style.transformOrigin = '0 0'", $output);
+    }
+
     public function testAllPlaceholdersAreSubstituted(): void
     {
         $output = (new PortalReporter())->render($this->simpleData());
