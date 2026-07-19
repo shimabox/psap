@@ -32,7 +32,9 @@ final class PortalReporterTest extends TestCase
         $output = (new PortalReporter())->render($data);
 
         self::assertStringStartsWith('<!doctype html>', $output);
-        self::assertStringContainsString('<title>psap — Architecture portal</title>', $output);
+        self::assertStringContainsString('<title>psap — SAP Analysis Report</title>', $output);
+        self::assertStringContainsString('<h1 data-i18n="headline">SAP Analysis Report</h1>', $output);
+        self::assertStringContainsString("headline: 'SAP解析レポート'", $output);
         self::assertStringContainsString('Content-Security-Policy', $output);
         // タブ / 各セクションが揃っている
         self::assertStringContainsString('id="panel-overview"', $output);
