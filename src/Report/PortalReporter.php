@@ -35,6 +35,8 @@ final class PortalReporter implements ReporterInterface
 
     private const string MERMAID_ASSET_PATH = __DIR__ . '/../../resources/js/mermaid.min.js';
 
+    private const string MERMAID_LICENSE_PATH = __DIR__ . '/../../resources/js/mermaid.LICENSE';
+
     /** 同梱している mermaid のバージョン（resources/js/README.md と一致させる） */
     private const string MERMAID_VERSION = '11.16.0';
 
@@ -49,6 +51,7 @@ final class PortalReporter implements ReporterInterface
         $plantuml = (new PlantUmlReporter())->render($data);
         $markdown = (new MarkdownReporter())->render($data);
         $mermaidJs = $this->loadMermaidAsset();
+        $mermaidLicense = $this->loadMermaidLicense();
 
         $edgeCount = count($data->dependencyGraph->edges);
         $flowchartRenderable = $edgeCount <= self::FLOWCHART_MAX_EDGES;
@@ -63,6 +66,7 @@ final class PortalReporter implements ReporterInterface
             '__PSAP_PLANTUML__' => $this->encode($plantuml),
             '__PSAP_MARKDOWN__' => $this->encode($markdown),
             '__PSAP_MERMAID_VERSION__' => self::MERMAID_VERSION,
+            '__PSAP_MERMAID_LICENSE__' => $mermaidLicense,
             '__PSAP_MERMAID_JS__' => $mermaidJs,
         ];
 
@@ -100,6 +104,29 @@ final class PortalReporter implements ReporterInterface
         }
 
         return $asset;
+    }
+
+    /**
+     * mermaid の MIT ライセンス全文を読み込み、HTML コメント内に安全に埋め込める形にする。
+     *
+     * MIT ライセンスは「著作権表示と本許諾表示をソフトウェアのすべての複製に記載する」ことを
+     * 要求する。ポータルは単一ファイルで共有される前提のため、パス案内では要件を満たせない。
+     * よって全文を出力 HTML の <!-- --> コメントへ埋め込む。コメントは `--` の連続で壊れるため、
+     * 将来ライセンス文が変わっても安全なよう `--` を `- -` に無害化してから返す
+     * （現行の MIT 本文には `--` は含まれない）。
+     */
+    private function loadMermaidLicense(): string
+    {
+        $license = @file_get_contents(self::MERMAID_LICENSE_PATH);
+        if ($license === false) {
+            throw new RuntimeException(sprintf(
+                'ポータルに同梱する mermaid のライセンス文を読み込めませんでした: %s。'
+                . '配布物に resources/ が同梱されているか確認してください。',
+                self::MERMAID_LICENSE_PATH,
+            ));
+        }
+
+        return str_replace('--', '- -', rtrim($license, "\n"));
     }
 
     /**
@@ -705,8 +732,9 @@ final class PortalReporter implements ReporterInterface
   <script id="psap-portal-data" type="application/json">__PSAP_DATA__</script>
   <!--
     Bundled Mermaid v__PSAP_MERMAID_VERSION__ is distributed under the MIT License.
-    Copyright (c) 2014-2022 Knut Sveidqvist and Mermaid contributors.
-    Full license text: resources/js/mermaid.LICENSE
+    The full license text follows.
+
+__PSAP_MERMAID_LICENSE__
   -->
   <script>__PSAP_MERMAID_JS__</script>
   <script>

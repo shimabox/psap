@@ -50,8 +50,15 @@ final class PortalReporterTest extends TestCase
         // mermaid 本体がインラインされ、strict で初期化される
         self::assertStringContainsString('globalThis["mermaid"]', $output);
         self::assertStringContainsString("securityLevel: 'strict'", $output);
-        // ライセンス表記
+        // ライセンス: バージョン表記に加え、MIT ライセンス全文を埋め込む
+        // （単一ファイルで共有されるため、パス案内では MIT の要件を満たせない）
         self::assertStringContainsString('Bundled Mermaid v11.16.0 is distributed under the MIT License', $output);
+        self::assertStringNotContainsString('Full license text: resources/js/mermaid.LICENSE', $output);
+        $license = (string) file_get_contents(__DIR__ . '/../../../resources/js/mermaid.LICENSE');
+        self::assertStringContainsString(rtrim($license, "\n"), $output);
+        self::assertStringContainsString('Copyright (c) 2014 - 2022 Knut Sveidqvist', $output);
+        self::assertStringContainsString('The above copyright notice and this permission notice shall be included in all', $output);
+        self::assertStringContainsString('THE SOFTWARE IS PROVIDED "AS IS"', $output);
     }
 
     public function testCopyReportsSuccessOnlyWhenClipboardActuallyWorks(): void

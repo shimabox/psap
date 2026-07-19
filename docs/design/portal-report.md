@@ -75,7 +75,9 @@ PortalReporter
  └─ ReportData から直接 → サマリー、循環詳細（PHP 側で HTML 生成）
 ```
 
-Markdown レポート全文は含めない。サマリーと循環詳細は ReportData から直接 HTML を組み立てる方が、Markdown → HTML 変換ライブラリの同梱より小さく確実なため。
+Markdown レポートを **HTML へ変換して表示することはしない**。サマリーと循環詳細は ReportData から直接 HTML を組み立てる方が、Markdown → HTML 変換ライブラリの同梱より小さく確実なため。
+
+> 後続の仕様変更（2026-07-19）: Sources タブに、`MarkdownReporter` の出力を **変換せずそのまま**（プレーンテキストの `<pre>` 表示 + コピー + ダウンロード、ファイル名 `psap-report.md`）同梱するようにした。変換ライブラリを足さない当初の判断は維持したまま、図ソースと同じ扱いで Markdown も 1 ファイルから取り出せるようにしたもの。
 
 ### タブ構成（単一 HTML 内のセクション切替）
 
@@ -85,7 +87,7 @@ Markdown レポート全文は含めない。サマリーと循環詳細は Repo
 | Interactive I/A | 既存のインタラクティブ I/A グラフ | HtmlReporter の出力を `<iframe srcdoc="...">` へ埋め込み |
 | Diagrams | quadrantChart と依存 flowchart | mermaid.js でクライアント描画 |
 | Cycles | 循環グループごとの経路・原因クラス・ファイル・行番号 | PHP 側で HTML 生成 |
-| Sources | .mmd / .puml のソース表示、コピー、ダウンロード | `<pre>` + Clipboard API + Blob ダウンロード |
+| Sources | .mmd / .puml / .md のソース表示、コピー、ダウンロード | `<pre>` + Clipboard API + Blob ダウンロード |
 
 iframe srcdoc を選ぶ理由: HtmlReporter は 1,800 行超の自己完結テンプレートで、CSS / JS の名前空間がポータル側と衝突する。srcdoc なら無改修で分離埋め込みでき、既存レポートの変更リスクがゼロになる。srcdoc 属性値は HTML エスケープ（`&` `"` `<` `>`）して埋め込む。
 
