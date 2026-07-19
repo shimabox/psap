@@ -138,7 +138,7 @@ psap analyze <paths>... [options]
 | オプション | 内容 | 初期値 |
 |---|---|---|
 | `--depth` | 名前空間を束ねる深さ。`auto`または1以上の整数 | `auto` |
-| `--format` | `text`、`json`、`markdown`、`html`、`mermaid`、`plantuml` | `text` |
+| `--format` | `text`、`json`、`markdown`、`html`、`mermaid`、`plantuml`、`portal` | `text` |
 | `--output` | 出力先ファイル | 標準出力 |
 | `--exclude` | fnmatch形式の除外パターン。複数指定可 | なし |
 | `--threshold` | Dが指定値を超えた場合に失敗 | なし |
@@ -166,9 +166,17 @@ psap analyze src/ --format markdown --output report.md
 psap analyze src/ --format html --output report.html
 psap analyze src/ --format mermaid --output report.mmd
 psap analyze src/ --format plantuml --output report.puml
+psap analyze src/ --format portal --output psap-portal.html
 ```
 
 `report.html`は外部アセットを必要としないため、そのままブラウザで開けます。点を選ぶと、名前空間コンポーネントの指標と所属クラスを確認できます。
+
+`portal`は、サマリー・インタラクティブI/Aグラフ・Mermaid図・循環詳細・図ソースを1つの自己完結HTMLにまとめた入口です。標準名は`psap-portal.html`を推奨します。Diagramsタブの`quadrantChart`と依存フローチャートは同梱したMermaidがブラウザ内で描画し、`+`/`−`/Resetボタン・Ctrl/Cmd+スクロール・ドラッグで拡大・移動できます。SourcesタブからはMermaid（`.mmd`）・PlantUML（`.puml`）の図ソースとMarkdownレポート（`psap-report.md`）をコピー・ダウンロードできます。解析結果もMermaidも1ファイルに収まるため外部通信は発生せず、出力サイズは`html`より大きく+3.5MB前後になります。依存フローチャートのエッジ数が500を超える場合は、ブラウザ内描画を省略してソース表示へフォールバックします。
+
+```bash
+docker run --rm -v "$PWD":/workdir psap \
+  analyze src/ --format portal --output psap-portal.html
+```
 
 PlantUMLからPNGまで生成する場合は、PlantUML、Java、Graphviz、CJKフォントを含むイメージを使います。
 

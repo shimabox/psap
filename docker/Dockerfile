@@ -34,6 +34,7 @@ WORKDIR /app
 COPY --from=vendor /app/vendor ./vendor
 COPY src ./src
 COPY bin ./bin
+COPY resources ./resources
 
 WORKDIR /workdir
 
@@ -49,6 +50,7 @@ ARG PHAR_COMPOSER_VERSION=1.4.0
 COPY composer.json ./
 COPY src ./src
 COPY bin ./bin
+COPY resources ./resources
 
 ADD https://github.com/clue/phar-composer/releases/download/v${PHAR_COMPOSER_VERSION}/phar-composer-${PHAR_COMPOSER_VERSION}.phar /usr/local/bin/phar-composer.phar
 RUN chmod +x /usr/local/bin/phar-composer.phar \

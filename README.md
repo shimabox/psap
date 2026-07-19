@@ -74,6 +74,19 @@ docker run --rm -v "$PWD":/workdir psap \
 
 HTMLは実際のゾーン判定を円弧で表示します。Mermaidの`quadrantChart`は同じゾーンを象限として近似表示するため、形は異なりますが点の指標と座標は共通です。
 
+サマリー、I/Aグラフ、図、循環詳細、図ソースを1ファイルにまとめたポータル（`--format portal`）も生成できます。
+
+```bash
+docker run --rm -v "$PWD":/workdir psap \
+  analyze src/ --format portal --output psap-portal.html
+```
+
+`psap-portal.html`をブラウザで開くと、Overview・Interactive I/A・Diagrams・Cycles・Sourcesのタブを切り替えられます。Diagramsタブの`quadrantChart`と依存フローチャートは同梱したMermaidがブラウザ内で描画し、拡大・移動もできます。SourcesタブからはMermaid（`.mmd`）・PlantUML（`.puml`）の図ソースとMarkdownレポート（`psap-report.md`）をコピー・ダウンロードできます。解析結果もMermaidも1ファイルに収まるため外部通信は発生せず、出力サイズは+3.5MB前後になります。
+
+![psapのポータルレポート。Diagramsタブでブラウザ内描画したI/A象限チャートと依存フローチャートを表示](docs/images/portal-report.png)
+
+依存フローチャートのエッジ数が500を超えると、ブラウザ内描画を省略してソース表示に切り替えます。
+
 ### 4 生成AIへ渡す
 
 Codexなど、解析対象のコードを読める生成AIに次のように依頼します。
