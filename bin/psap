@@ -5,7 +5,28 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../vendor/autoload.php';
+// Composer の依存としてインストールされた場合（vendor/shimabox/psap/bin/psap）と、
+// リポジトリを直接クローンした場合・phar の場合とでオートローダーの位置が異なる。
+(static function (): void {
+    $candidates = [
+        __DIR__ . '/../../../autoload.php',
+        __DIR__ . '/../vendor/autoload.php',
+    ];
+
+    foreach ($candidates as $candidate) {
+        if (file_exists($candidate)) {
+            require $candidate;
+
+            return;
+        }
+    }
+
+    fwrite(
+        STDERR,
+        'Composer のオートローダーが見つかりません。composer install を実行してください。' . PHP_EOL,
+    );
+    exit(1);
+})();
 
 use Psap\Console\AnalyzeCommand;
 use Symfony\Component\Console\Application;
