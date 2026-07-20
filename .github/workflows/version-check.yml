@@ -1,0 +1,43 @@
+# リリース用タグを push したときに、タグ名と psap --version が一致することを確認する。
+#
+# bin/psap のバージョンは直書きのため、上げ忘れたままタグを打つと
+# psap --version が古い値を返したまま公開されてしまう。
+# GitHub リリースを作る前にこのゲートで気付けるようにする。
+name: Version Check
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  version-tag-match:
+    name: タグと psap --version の整合性
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: PHP をセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      # bin/psap の起動にオートローダーが要るだけなので dev 依存は入れない
+      - name: 依存関係をインストール（--no-dev）
+        run: composer install --no-dev --prefer-dist --no-progress
+
+      - name: タグと psap --version が一致することを確認
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          reported_version="$(php bin/psap --version | awk '{print $2}')"
+
+          echo "タグ:            ${GITHUB_REF_NAME} (${tag_version})"
+          echo "psap --version:  ${reported_version}"
+
+          if [ "${tag_version}" != "${reported_version}" ]; then
+            echo "::error::タグ ${GITHUB_REF_NAME} と psap --version (${reported_version}) が一致しません。bin/psap のバージョン文字列を更新してタグを打ち直してください。"
+            exit 1
+          fi
+
+          echo "一致しました。"
