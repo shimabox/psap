@@ -113,14 +113,18 @@ jobs:
           cd "$RUNNER_TEMP/consumer"
           printf '<?php\nnamespace App\\Domain;\nclass Order {}\n' > src/Order.php
           composer init --quiet --name=test/consumer --no-interaction
-          composer config minimum-stability dev
           composer config repositories.psap path "$GITHUB_WORKSPACE/psap-src"
-          composer require --dev --no-progress --no-interaction "shimabox/psap:*"
+          # psap 自身は path リポジトリ由来で dev 版になるため @dev を付けるが、
+          # minimum-stability は下げない（他の依存まで開発ブランチで入ってしまい、
+          # CI が不安定になるうえ利用者の通常構成を再現できなくなる）
+          composer require --dev --no-progress --no-interaction "shimabox/psap:*@dev"
 
       - name: vendor/bin/psap を実行する
         run: |
           cd "$RUNNER_TEMP/consumer"
-          test -L vendor/shimabox/psap || echo "警告: シンボリックリンクではなく実体でインストールされました"
+          # 実体でインストールされるとバイナリプロキシ経由の解決を検証できないため、
+          # シンボリックリンクであることをこのジョブの前提として強制する
+          test -L vendor/shimabox/psap
           vendor/bin/psap --version
           vendor/bin/psap analyze src/ --format text
 
