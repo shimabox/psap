@@ -1,5 +1,6 @@
 # psap
 
+[![Latest Stable Version](https://img.shields.io/packagist/v/shimabox/psap)](https://packagist.org/packages/shimabox/psap)
 [![CI](https://github.com/shimabox/psap/actions/workflows/ci.yml/badge.svg)](https://github.com/shimabox/psap/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
