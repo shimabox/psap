@@ -121,11 +121,19 @@ php psap.phar analyze src/
 
 ## Composer
 
-Packagistにはまだ公開していません。GitHubリポジトリを指定してインストールします。
+解析対象プロジェクトのオートローダーは使わないため、グローバルに入れて構いません。
 
 ```bash
-composer config repositories.psap vcs https://github.com/shimabox/psap
-composer require --dev shimabox/psap:dev-main
+composer global require shimabox/psap
+psap analyze src/
+```
+
+`psap`が見つからない場合は`composer global config bin-dir --absolute`が示すディレクトリを`PATH`へ追加します。
+
+プロジェクトの開発依存として入れることもできます。
+
+```bash
+composer require --dev shimabox/psap
 vendor/bin/psap analyze src/
 ```
 

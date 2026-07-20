@@ -5,7 +5,31 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../vendor/autoload.php';
+// オートローダーの位置は導入方法で変わる。Composer 2.2 以降のバイナリプロキシは
+// 実体を読み込む前に $GLOBALS['_composer_autoload_path'] を定義するため、これを最優先で使う。
+// path リポジトリでシンボリックリンクされた場合、__DIR__ は依存先ではなくリンク元の
+// ソース側を指すため、相対パス探索だけでは解決できない。
+(static function (): void {
+    $candidates = [
+        $GLOBALS['_composer_autoload_path'] ?? null, // Composer のバイナリプロキシ経由
+        __DIR__ . '/../../../autoload.php',          // vendor/shimabox/psap/bin から直接実行
+        __DIR__ . '/../vendor/autoload.php',         // クローン / phar
+    ];
+
+    foreach (array_filter($candidates) as $candidate) {
+        if (file_exists($candidate)) {
+            require $candidate;
+
+            return;
+        }
+    }
+
+    fwrite(
+        STDERR,
+        'Composer のオートローダーが見つかりません。composer install を実行してください。' . PHP_EOL,
+    );
+    exit(1);
+})();
 
 use Psap\Console\AnalyzeCommand;
 use Symfony\Component\Console\Application;

@@ -32,13 +32,13 @@ git clone https://github.com/shimabox/psap.git
 docker build -t psap --target dist -f psap/docker/Dockerfile psap
 ```
 
-PHP 8.3以降があれば、[最新リリース](https://github.com/shimabox/psap/releases/latest)のpsap.pharでも使えます（[使い方](docs/getting-started.md#phar)）。
-
 インストールできたことを確認します。
 
 ```bash
 docker run --rm psap --version
 ```
+
+PHP 8.3以降があれば、[Composer](docs/getting-started.md#composer)（`composer global require shimabox/psap`）や[最新リリース](https://github.com/shimabox/psap/releases/latest)の[psap.phar](docs/getting-started.md#phar)でも導入できます。その場合は以降の`docker run --rm -v "$PWD":/workdir psap`を`psap`（pharは`php psap.phar`）へ読み替えてください。
 
 ### 2 レポートを作る
 

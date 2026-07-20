@@ -1,8 +1,13 @@
 # CI ワークフロー。
-#   checks        … PHP 8.3 / 8.4 / 8.5 のマトリクスで composer validate / test / stan / cs を実行
-#   no-dev-smoke  … PHP 8.3 + composer install --no-dev（本番相当。dev 依存が持ち込む
+#   checks         … PHP 8.3 / 8.4 / 8.5 のマトリクスで composer validate / test / stan / cs を実行
+#   console-lowest … symfony/console を 6.4 系（下限）へ落として test + CLI スモークを実行。
+#                    composer.json の "^6.4 || ^7" が実際に動くことを保証するゲート
+#   composer-install-smoke
+#                  … 一時プロジェクトへ依存としてインストールし、vendor/bin/psap を起動する。
+#                    Composer のバイナリプロキシ経由でのオートローダー解決を保証するゲート
+#   no-dev-smoke   … PHP 8.3 + composer install --no-dev（本番相当。dev 依存が持ち込む
 #                    polyfill-php84/85 に隠れて 8.3 非互換な関数が紛れ込む再発を防ぐゲート）
-#   self-metrics  … checks 成功後、psap 自身で src/ を計測し（ドッグフーディング）、
+#   self-metrics   … checks 成功後、psap 自身で src/ を計測し（ドッグフーディング）、
 #                    レポートを Artifact 化 + Step Summary に表示。循環依存があれば失敗させる
 name: CI
 
@@ -53,6 +58,75 @@ jobs:
 
       - name: コーディングスタイルをチェック（php-cs-fixer dry-run）
         run: composer cs
+
+  console-lowest:
+    name: checks (PHP 8.3, symfony/console ^6.4)
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: PHP をセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      # composer.json / composer.lock を書き換えて解決し直すため、
+      # composer.lock ハッシュを鍵にした vendor キャッシュは使わない。
+      # また同じ理由で composer validate --strict もこのジョブでは実行しない。
+      - name: symfony/console を 6.4 系へ固定して依存を解決
+        run: |
+          composer require --no-update symfony/console:^6.4
+          composer update --prefer-dist --no-progress --no-interaction
+
+      - name: 解決結果を表示
+        run: composer show symfony/console
+
+      - name: テストを実行（phpunit）
+        run: composer test
+
+      - name: CLI スモークテスト
+        run: php bin/psap analyze src/ --format text
+
+  composer-install-smoke:
+    name: composer install smoke (PHP 8.3, path repository)
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+        with:
+          path: psap-src
+
+      - name: PHP をセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      # 利用者と同じく「依存として入れて vendor/bin から起動する」経路を確認する。
+      # path リポジトリは既定でシンボリックリンクされるため、bin/psap が
+      # $GLOBALS['_composer_autoload_path'] からオートローダーを解決できないと失敗する。
+      - name: 一時プロジェクトへ依存としてインストールする
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer/src"
+          cd "$RUNNER_TEMP/consumer"
+          printf '<?php\nnamespace App\\Domain;\nclass Order {}\n' > src/Order.php
+          composer init --quiet --name=test/consumer --no-interaction
+          composer config repositories.psap path "$GITHUB_WORKSPACE/psap-src"
+          # psap 自身は path リポジトリ由来で dev 版になるため @dev を付けるが、
+          # minimum-stability は下げない（他の依存まで開発ブランチで入ってしまい、
+          # CI が不安定になるうえ利用者の通常構成を再現できなくなる）
+          composer require --dev --no-progress --no-interaction "shimabox/psap:*@dev"
+
+      - name: vendor/bin/psap を実行する
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          # 実体でインストールされるとバイナリプロキシ経由の解決を検証できないため、
+          # シンボリックリンクであることをこのジョブの前提として強制する
+          test -L vendor/shimabox/psap
+          vendor/bin/psap --version
+          vendor/bin/psap analyze src/ --format text
 
   no-dev-smoke:
     name: no-dev smoke (PHP 8.3, --no-dev)
