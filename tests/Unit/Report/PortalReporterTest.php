@@ -130,6 +130,22 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('quadrantChart: { useMaxWidth: false }', $output);
     }
 
+    public function testZoomUpperBoundScalesWithDiagramNaturalSize(): void
+    {
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        // 上限は固定倍率ではなく、実寸(viewBox)とフィット表示幅の比から図ごとに算出する
+        self::assertStringContainsString('const ZOOM_NATURAL_HEADROOM = 2', $output);
+        self::assertStringContainsString('const naturalWidth = svg.viewBox.baseVal ? svg.viewBox.baseVal.width : 0', $output);
+        self::assertStringContainsString('const fittedWidth = svg.getBoundingClientRect().width / state.scale', $output);
+        // 実寸の2倍まで拡大でき、小さい図では ZOOM_MAX(10倍)がフロアとして残る
+        self::assertStringContainsString('Math.max(ZOOM_MAX, (naturalWidth / fittedWidth) * ZOOM_NATURAL_HEADROOM)', $output);
+        // 実寸やフィット幅が取れない場合は固定上限にフォールバック
+        self::assertStringContainsString('if (naturalWidth <= 0 || fittedWidth <= 0) return ZOOM_MAX', $output);
+        // ズーム操作は動的上限でクランプされる
+        self::assertStringContainsString('Math.min(maxZoom(), Math.max(ZOOM_MIN, state.scale * factor))', $output);
+    }
+
     public function testSourcesTabIncludesMarkdownReport(): void
     {
         $output = (new PortalReporter())->render($this->simpleData());
