@@ -544,6 +544,9 @@ final class PortalReporter implements ReporterInterface
     }
     .diagram.zoomable.dragging { cursor: grabbing; user-select: none; }
     .diagram.zoomable:fullscreen { height: 100%; max-height: none; border: 0; }
+    /* Same as :fullscreen; kept as a separate rule because an unknown
+       pseudo-class would invalidate a combined selector list. */
+    .diagram.zoomable:-webkit-full-screen { height: 100%; max-height: none; border: 0; }
     .diagram.zoomable svg { max-width: none; height: auto; display: block; }
     .zoom-controls { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; }
     .zoom-btn {
@@ -1103,18 +1106,24 @@ __PSAP_MERMAID_LICENSE__
           zoomAt(factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
         }
 
+        // Fullscreen support including WebKit-prefixed engines (request, exit and
+        // element detection must all use the same vendor family). Where neither
+        // API exists (e.g. iPhone Safari) the button is not rendered at all.
+        const requestFullscreen = container.requestFullscreen ?? container.webkitRequestFullscreen;
+        const toggleFullscreen = () => {
+          if ((document.fullscreenElement ?? document.webkitFullscreenElement) === container) {
+            (document.exitFullscreen ?? document.webkitExitFullscreen).call(document);
+          } else {
+            requestFullscreen.call(container);
+          }
+        };
+
         const controls = document.createElement('div');
         controls.className = 'zoom-controls';
         controls.append(
           zoomButton('+', 'zoomIn', () => zoomAtCenter(ZOOM_STEP)),
           zoomButton('−', 'zoomOut', () => zoomAtCenter(1 / ZOOM_STEP)),
-          zoomButton('⛶', 'zoomFullscreen', () => {
-            if (document.fullscreenElement === container) {
-              document.exitFullscreen();
-            } else {
-              (container.requestFullscreen ?? container.webkitRequestFullscreen).call(container);
-            }
-          }),
+          ...(requestFullscreen ? [zoomButton('⛶', 'zoomFullscreen', toggleFullscreen)] : []),
           zoomButton(t('zoomReset'), 'zoomReset', reset, 'zoomResetTitle'),
         );
         container.append(controls);
@@ -1164,6 +1173,9 @@ __PSAP_MERMAID_LICENSE__
         // The Reset button also localizes its label; +/− keep their symbol and
         // only localize the tooltip.
         if (labelKey === 'zoomReset') button.dataset.i18n = labelKey;
+        // Symbol-only buttons need an accessible name beyond their glyph.
+        button.setAttribute('aria-label', t(labelKey));
+        button.dataset.i18nAriaLabel = labelKey;
         const tooltipKey = titleKey ?? labelKey;
         button.title = t(tooltipKey);
         button.dataset.i18nTitle = tooltipKey;
