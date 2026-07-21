@@ -103,6 +103,11 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString("zoomButton('+', 'zoomIn'", $output);
         self::assertStringContainsString("zoomButton('−', 'zoomOut'", $output);
         self::assertStringContainsString("zoomButton(t('zoomReset'), 'zoomReset', reset, 'zoomResetTitle')", $output);
+        // 全画面トグル（狭い帯状のコンテナでも大画面で確認できる）
+        self::assertStringContainsString("zoomButton('⛶', 'zoomFullscreen'", $output);
+        self::assertStringContainsString('.diagram.zoomable:fullscreen', $output);
+        self::assertStringContainsString("zoomFullscreen: 'Toggle fullscreen'", $output);
+        self::assertStringContainsString("zoomFullscreen: '全画面表示を切り替え'", $output);
         // Ctrl/Cmd+ホイールでのみズーム、それ以外はページスクロールを妨げない
         self::assertStringContainsString('if (!(event.ctrlKey || event.metaKey)) return;', $output);
         // ズーム/パン用の文言が en/ja に追加されている
