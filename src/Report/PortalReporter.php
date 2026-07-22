@@ -543,10 +543,16 @@ final class PortalReporter implements ReporterInterface
       cursor: grab;
     }
     .diagram.zoomable.dragging { cursor: grabbing; user-select: none; }
+    .diagram.zoomable:fullscreen { height: 100%; max-height: none; border: 0; }
+    /* Same as :fullscreen; kept as a separate rule because an unknown
+       pseudo-class would invalidate a combined selector list. */
+    .diagram.zoomable:-webkit-full-screen { height: 100%; max-height: none; border: 0; }
     .diagram.zoomable svg { max-width: none; height: auto; display: block; }
     .zoom-controls { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; }
     .zoom-btn {
       min-width: 30px;
+      user-select: none;
+      -webkit-user-select: none;
       border: 1px solid var(--ink);
       background: rgb(255 255 255 / 92%);
       color: var(--ink);
@@ -785,6 +791,7 @@ __PSAP_MERMAID_LICENSE__
           zoomOut: 'Zoom out',
           zoomReset: 'Reset',
           zoomResetTitle: 'Reset zoom and pan',
+          zoomFullscreen: 'Toggle fullscreen',
           zoomHint: 'Ctrl/Cmd+scroll to zoom, drag to pan',
           cyclesHeading: 'Circular dependencies',
           cyclesIntro: 'Each group shows one representative shortest path and the class-level evidence that creates its component dependencies.',
@@ -852,6 +859,7 @@ __PSAP_MERMAID_LICENSE__
           zoomOut: '縮小',
           zoomReset: 'リセット',
           zoomResetTitle: 'ズームと位置をリセット',
+          zoomFullscreen: '全画面表示を切り替え',
           zoomHint: 'Ctrl/Cmd+スクロールで拡縮、ドラッグで移動',
           cyclesHeading: '循環依存',
           cyclesIntro: '各グループには代表となる最短経路と、コンポーネント間依存を生むクラス単位の根拠を表示します。',
@@ -1039,11 +1047,15 @@ __PSAP_MERMAID_LICENSE__
       }
 
       // Zoom/pan tuning. ZOOM_STEP is the per-click / per-wheel-tick scale factor;
-      // ZOOM_MIN / ZOOM_MAX bound how far a diagram can shrink or grow.
+      // ZOOM_MIN bounds how far a diagram can shrink. The upper bound is dynamic:
+      // a large diagram starts fitted (shrunk) to the container width, so a fixed
+      // multiplier could leave it unreadable no matter how far the user zooms.
+      // Each diagram may instead zoom up to its natural 1:1 size times
+      // ZOOM_NATURAL_HEADROOM, with ZOOM_MAX as the floor for small diagrams.
       const ZOOM_STEP = 1.25;
       const ZOOM_MIN = 0.2;
       const ZOOM_MAX = 10;
-      const clampZoom = (scale) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
+      const ZOOM_NATURAL_HEADROOM = 2;
 
       // initZoomPan makes a successfully-rendered diagram container zoomable and
       // pannable. The scale/translate transform is applied to the inner <svg>
@@ -1066,10 +1078,20 @@ __PSAP_MERMAID_LICENSE__
         };
         const reset = () => { state.scale = 1; state.x = 0; state.y = 0; apply(); };
 
+        // Reaching the diagram's natural size needs scale naturalWidth/fittedWidth,
+        // where fittedWidth is the untransformed on-screen width. Computed lazily
+        // because the fitted width follows the container's current size.
+        const maxZoom = () => {
+          const naturalWidth = svg.viewBox.baseVal ? svg.viewBox.baseVal.width : 0;
+          const fittedWidth = svg.getBoundingClientRect().width / state.scale;
+          if (naturalWidth <= 0 || fittedWidth <= 0) return ZOOM_MAX;
+          return Math.max(ZOOM_MAX, (naturalWidth / fittedWidth) * ZOOM_NATURAL_HEADROOM);
+        };
+
         // Rescale around a viewport point (e.g. the cursor) so whatever sits under
         // it stays under it after the scale change.
         function zoomAt(factor, clientX, clientY) {
-          const newScale = clampZoom(state.scale * factor);
+          const newScale = Math.min(maxZoom(), Math.max(ZOOM_MIN, state.scale * factor));
           if (newScale === state.scale) return;
           const rect = container.getBoundingClientRect();
           const originX = clientX - rect.left;
@@ -1084,11 +1106,24 @@ __PSAP_MERMAID_LICENSE__
           zoomAt(factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
         }
 
+        // Fullscreen support including WebKit-prefixed engines (request, exit and
+        // element detection must all use the same vendor family). Where neither
+        // API exists (e.g. iPhone Safari) the button is not rendered at all.
+        const requestFullscreen = container.requestFullscreen ?? container.webkitRequestFullscreen;
+        const toggleFullscreen = () => {
+          if ((document.fullscreenElement ?? document.webkitFullscreenElement) === container) {
+            (document.exitFullscreen ?? document.webkitExitFullscreen).call(document);
+          } else {
+            requestFullscreen.call(container);
+          }
+        };
+
         const controls = document.createElement('div');
         controls.className = 'zoom-controls';
         controls.append(
           zoomButton('+', 'zoomIn', () => zoomAtCenter(ZOOM_STEP)),
           zoomButton('−', 'zoomOut', () => zoomAtCenter(1 / ZOOM_STEP)),
+          ...(requestFullscreen ? [zoomButton('⛶', 'zoomFullscreen', toggleFullscreen)] : []),
           zoomButton(t('zoomReset'), 'zoomReset', reset, 'zoomResetTitle'),
         );
         container.append(controls);
@@ -1138,6 +1173,9 @@ __PSAP_MERMAID_LICENSE__
         // The Reset button also localizes its label; +/− keep their symbol and
         // only localize the tooltip.
         if (labelKey === 'zoomReset') button.dataset.i18n = labelKey;
+        // Symbol-only buttons need an accessible name beyond their glyph.
+        button.setAttribute('aria-label', t(labelKey));
+        button.dataset.i18nAriaLabel = labelKey;
         const tooltipKey = titleKey ?? labelKey;
         button.title = t(tooltipKey);
         button.dataset.i18nTitle = tooltipKey;

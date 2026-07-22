@@ -103,6 +103,20 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString("zoomButton('+', 'zoomIn'", $output);
         self::assertStringContainsString("zoomButton('−', 'zoomOut'", $output);
         self::assertStringContainsString("zoomButton(t('zoomReset'), 'zoomReset', reset, 'zoomResetTitle')", $output);
+        // 全画面トグル（狭い帯状のコンテナでも大画面で確認できる）
+        self::assertStringContainsString("zoomButton('⛶', 'zoomFullscreen'", $output);
+        self::assertStringContainsString('.diagram.zoomable:fullscreen', $output);
+        self::assertStringContainsString("zoomFullscreen: 'Toggle fullscreen'", $output);
+        self::assertStringContainsString("zoomFullscreen: '全画面表示を切り替え'", $output);
+        // WebKit接頭辞環境でも要求・終了・検出・CSSを一貫させ、API皆無ならボタン自体を出さない
+        self::assertStringContainsString('container.requestFullscreen ?? container.webkitRequestFullscreen', $output);
+        self::assertStringContainsString('document.fullscreenElement ?? document.webkitFullscreenElement', $output);
+        self::assertStringContainsString('document.exitFullscreen ?? document.webkitExitFullscreen', $output);
+        self::assertStringContainsString('.diagram.zoomable:-webkit-full-screen', $output);
+        self::assertStringContainsString('requestFullscreen ? [zoomButton', $output);
+        // 記号ボタンにも aria-label を付ける（言語切替にも追従）
+        self::assertStringContainsString("button.setAttribute('aria-label', t(labelKey))", $output);
+        self::assertStringContainsString('button.dataset.i18nAriaLabel = labelKey', $output);
         // Ctrl/Cmd+ホイールでのみズーム、それ以外はページスクロールを妨げない
         self::assertStringContainsString('if (!(event.ctrlKey || event.metaKey)) return;', $output);
         // ズーム/パン用の文言が en/ja に追加されている
@@ -114,6 +128,22 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString("svg.style.transformOrigin = '0 0'", $output);
         // quadrant は素のサイズで描画（コンテナ幅いっぱいに引き伸ばさない）
         self::assertStringContainsString('quadrantChart: { useMaxWidth: false }', $output);
+    }
+
+    public function testZoomUpperBoundScalesWithDiagramNaturalSize(): void
+    {
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        // 上限は固定倍率ではなく、実寸(viewBox)とフィット表示幅の比から図ごとに算出する
+        self::assertStringContainsString('const ZOOM_NATURAL_HEADROOM = 2', $output);
+        self::assertStringContainsString('const naturalWidth = svg.viewBox.baseVal ? svg.viewBox.baseVal.width : 0', $output);
+        self::assertStringContainsString('const fittedWidth = svg.getBoundingClientRect().width / state.scale', $output);
+        // 実寸の2倍まで拡大でき、小さい図では ZOOM_MAX(10倍)がフロアとして残る
+        self::assertStringContainsString('Math.max(ZOOM_MAX, (naturalWidth / fittedWidth) * ZOOM_NATURAL_HEADROOM)', $output);
+        // 実寸やフィット幅が取れない場合は固定上限にフォールバック
+        self::assertStringContainsString('if (naturalWidth <= 0 || fittedWidth <= 0) return ZOOM_MAX', $output);
+        // ズーム操作は動的上限でクランプされる
+        self::assertStringContainsString('Math.min(maxZoom(), Math.max(ZOOM_MIN, state.scale * factor))', $output);
     }
 
     public function testSourcesTabIncludesMarkdownReport(): void
