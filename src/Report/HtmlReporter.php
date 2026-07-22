@@ -97,6 +97,13 @@ final class HtmlReporter implements ReporterInterface
 
     .language-field { min-width: 150px; }
 
+    /* Embedded in the portal iframe: the host page already provides a masthead
+       and a language selector, so hide this report's own title block and
+       selector. The summary tiles stay. */
+    body.embedded .masthead > div:first-child,
+    body.embedded .language-field { display: none; }
+    body.embedded .masthead { grid-template-columns: 1fr; }
+
     .eyebrow {
       margin: 0 0 6px;
       color: var(--main);
@@ -1687,6 +1694,20 @@ final class HtmlReporter implements ReporterInterface
         locale = language.value;
         applyLanguage();
       });
+      // Embedded mode: inside another page (the portal iframe), the host
+      // provides the masthead and language selector, so hide ours and follow
+      // the host's locale sent via postMessage.
+      if (window.self !== window.top) {
+        document.body.classList.add('embedded');
+        window.addEventListener('message', (event) => {
+          const data = event.data;
+          if (data && data.type === 'psap:set-locale' && Object.hasOwn(messages, data.locale)) {
+            locale = data.locale;
+            language.value = data.locale;
+            applyLanguage();
+          }
+        });
+      }
       document.getElementById('reset').addEventListener('click', () => {
         search.value = '';
         zoneFilter.value = 'all';

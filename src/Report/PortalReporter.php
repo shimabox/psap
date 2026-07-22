@@ -663,7 +663,7 @@ final class PortalReporter implements ReporterInterface
     <section class="panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">__PSAP_OVERVIEW_HTML__</section>
 
     <section class="panel" id="panel-interactive" role="tabpanel" aria-labelledby="tab-interactive" hidden>
-      <p class="iframe-hint" data-i18n="interactiveHint">The interactive Instability / Abstractness report is embedded below. It has its own language selector.</p>
+      <p class="iframe-hint" data-i18n="interactiveHint">The interactive Instability / Abstractness report is embedded below. It follows the language selector above.</p>
       <iframe class="report" title="psap interactive I/A report" data-i18n-title="interactiveTitle" srcdoc="__PSAP_IFRAME_HTML__"></iframe>
     </section>
 
@@ -779,7 +779,7 @@ __PSAP_MERMAID_LICENSE__
           uselessZone: 'Useless zone',
           mainSequence: 'Main sequence',
           noComponents: 'No components with evaluable metrics.',
-          interactiveHint: 'The interactive Instability / Abstractness report is embedded below. It has its own language selector.',
+          interactiveHint: 'The interactive Instability / Abstractness report is embedded below. It follows the language selector above.',
           interactiveTitle: 'psap interactive I/A report',
           quadrantHeading: 'I/A quadrant chart',
           quadrantNote: 'Rendered in your browser by the bundled Mermaid. Zones are shown as quadrant labels (an approximation of the radius-based zones).',
@@ -847,7 +847,7 @@ __PSAP_MERMAID_LICENSE__
           uselessZone: '無駄ゾーン',
           mainSequence: '主系列',
           noComponents: '評価可能な指標を持つコンポーネントがありません。',
-          interactiveHint: '対話型の不安定度／抽象度レポートを下に埋め込んでいます。独自の言語セレクターを持ちます。',
+          interactiveHint: '対話型の不安定度／抽象度レポートを下に埋め込んでいます。言語は上のセレクターに追従します。',
           interactiveTitle: 'psap 対話型 I/A レポート',
           quadrantHeading: 'I/A 象限チャート',
           quadrantNote: '同梱の Mermaid がブラウザ内で描画します。ゾーンは象限ラベルで近似表示します（円弧境界の近似）。',
@@ -902,9 +902,19 @@ __PSAP_MERMAID_LICENSE__
         return template.replace(/\{(\w+)\}/g, (match, name) => Object.hasOwn(values, name) ? String(values[name]) : match);
       }
 
+      // The embedded I/A report (iframe srcdoc) hides its own language selector
+      // and follows the portal's locale instead.
+      function syncReportLocale() {
+        const frame = document.querySelector('iframe.report');
+        if (frame && frame.contentWindow) {
+          frame.contentWindow.postMessage({ type: 'psap:set-locale', locale }, '*');
+        }
+      }
+
       function applyLanguage() {
         document.documentElement.lang = locale;
         document.title = t('documentTitle');
+        syncReportLocale();
         document.querySelectorAll('[data-i18n]').forEach((element) => {
           element.textContent = t(element.dataset.i18n);
         });
@@ -1187,6 +1197,9 @@ __PSAP_MERMAID_LICENSE__
         locale = language.value;
         applyLanguage();
       });
+      // If the language changed before the iframe finished loading, the sent
+      // locale was lost — resend once the embedded report is ready.
+      document.querySelector('iframe.report')?.addEventListener('load', syncReportLocale);
 
       applyLanguage();
     })();

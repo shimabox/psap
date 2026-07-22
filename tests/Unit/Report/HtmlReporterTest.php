@@ -302,6 +302,23 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString("componentInCycle: 'Part of 1 cycle group'", $output);
     }
 
+    public function testSupportsEmbeddedModeInsideAnotherPage(): void
+    {
+        $metrics = [$this->metrics('App\\Domain', 0.2, 0.75, 0.05)];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $output = (new HtmlReporter())->render($data);
+
+        // iframe 内では body.embedded を立て、見出しブロックと言語セレクターを隠す（統計タイルは残す）
+        self::assertStringContainsString('if (window.self !== window.top)', $output);
+        self::assertStringContainsString("document.body.classList.add('embedded')", $output);
+        self::assertStringContainsString('body.embedded .masthead > div:first-child', $output);
+        self::assertStringContainsString('body.embedded .language-field { display: none; }', $output);
+        // ホスト（ポータル）からの postMessage で言語に追従する（未知の locale は無視）
+        self::assertStringContainsString("data.type === 'psap:set-locale'", $output);
+        self::assertStringContainsString('Object.hasOwn(messages, data.locale)', $output);
+    }
+
     /**
      * @throws JsonException
      */

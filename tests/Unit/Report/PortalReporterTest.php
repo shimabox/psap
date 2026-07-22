@@ -130,6 +130,19 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('quadrantChart: { useMaxWidth: false }', $output);
     }
 
+    public function testEmbeddedReportFollowsPortalLanguage(): void
+    {
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        // ポータルの言語切替を iframe 内の I/A レポートへ postMessage で伝える
+        self::assertStringContainsString("frame.contentWindow.postMessage({ type: 'psap:set-locale', locale }, '*')", $output);
+        // iframe 読み込み完了前の切替が失われないよう、load 時にも再送する
+        self::assertStringContainsString("document.querySelector('iframe.report')?.addEventListener('load', syncReportLocale)", $output);
+        // 案内文は「独自のセレクター」ではなく「上のセレクターに追従」
+        self::assertStringContainsString('It follows the language selector above.', $output);
+        self::assertStringContainsString('言語は上のセレクターに追従します。', $output);
+    }
+
     public function testZoomUpperBoundScalesWithDiagramNaturalSize(): void
     {
         $output = (new PortalReporter())->render($this->simpleData());
