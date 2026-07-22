@@ -34,6 +34,6 @@ declare(strict_types=1);
 use Psap\Console\AnalyzeCommand;
 use Symfony\Component\Console\Application;
 
-$application = new Application('psap', '0.1.1');
+$application = new Application('psap', '0.1.2');
 $application->add(new AnalyzeCommand());
 $application->run();
