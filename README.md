@@ -41,6 +41,13 @@ docker run --rm psap --version
 
 PHP 8.3以降があれば、[Composer](docs/getting-started.md#composer)（`composer global require shimabox/psap`）や[最新リリース](https://github.com/shimabox/psap/releases/latest)の[psap.phar](docs/getting-started.md#phar)でも導入できます。その場合は以降の`docker run --rm -v "$PWD":/workdir psap`を`psap`（pharは`php psap.phar`）へ読み替えてください。
 
+psapはDockerイメージをレジストリで配布していません。新しいバージョンに更新する場合は、ソースを取得し直してイメージを再ビルドしてください。
+
+```bash
+git -C psap pull
+docker build -t psap --target dist -f psap/docker/Dockerfile psap
+```
+
 ### 2 レポートを作る
 
 解析したいPHPプロジェクトへ移動し、ソースディレクトリを指定します。
