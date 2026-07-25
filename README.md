@@ -40,6 +40,8 @@ docker pull ghcr.io/shimabox/psap:0.1.2
 docker tag ghcr.io/shimabox/psap:0.1.2 psap
 ```
 
+PlantUML・Java・Graphvizを同梱した版は`-plantuml`サフィックス（例: `latest-plantuml`）で配布しています（[使い方](docs/getting-started.md#docker)）。
+
 インストールできたことを確認します。
 
 ```bash
