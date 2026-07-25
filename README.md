@@ -48,7 +48,12 @@ docker run --rm psap --version
 
 PHP 8.3以降があれば、[Composer](docs/getting-started.md#composer)（`composer global require shimabox/psap`）や[最新リリース](https://github.com/shimabox/psap/releases/latest)の[psap.phar](docs/getting-started.md#phar)でも導入できます。その場合は以降の`docker run --rm -v "$PWD":/workdir psap`を`psap`（pharは`php psap.phar`）へ読み替えてください。
 
-新しいバージョンに更新する場合は、`docker pull`で最新イメージを取得し直すだけです。
+新しいバージョンに更新する場合は、`docker pull`で最新イメージを取得し、`docker tag`を実行し直します（`docker tag`はスナップショットのため、`pull`だけではローカルの`psap`タグは更新されません）。
+
+```bash
+docker pull ghcr.io/shimabox/psap:latest
+docker tag ghcr.io/shimabox/psap:latest psap
+```
 
 <details>
 <summary>ソースからビルドしたい場合</summary>
