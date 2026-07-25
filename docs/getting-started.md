@@ -2,12 +2,45 @@
 
 ## Docker
 
+GHCR (GitHub Container Registry) からイメージを取得します。
+
+```bash
+docker pull ghcr.io/shimabox/psap:latest
+docker tag ghcr.io/shimabox/psap:latest psap
+```
+
+バージョンを固定したい場合は`latest`の代わりにタグ（例: `0.1.2`）を指定します。
+
+```bash
+docker pull ghcr.io/shimabox/psap:0.1.2
+docker tag ghcr.io/shimabox/psap:0.1.2 psap
+```
+
+新しいバージョンに更新する場合は、`docker pull`で最新イメージを取得し、`docker tag`を実行し直します（`docker tag`はスナップショットのため、`pull`だけではローカルの`psap`タグは更新されません）。
+
+```bash
+docker pull ghcr.io/shimabox/psap:latest
+docker tag ghcr.io/shimabox/psap:latest psap
+```
+
+<details>
+<summary>ソースからビルドしたい場合</summary>
+
 リポジトリを取得し、配布用イメージをビルドします。
 
 ```bash
 git clone https://github.com/shimabox/psap.git
 docker build -t psap --target dist -f psap/docker/Dockerfile psap
 ```
+
+更新する場合はソースを取得し直してから再ビルドします。
+
+```bash
+git -C psap pull
+docker build -t psap --target dist -f psap/docker/Dockerfile psap
+```
+
+</details>
 
 解析対象のPHPプロジェクトへ移動して実行します。
 
