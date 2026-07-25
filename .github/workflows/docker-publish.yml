@@ -5,16 +5,22 @@
 # workflow_run 等で version-check.yml に依存させるとクロスワークフロー連携
 # 特有のタイミング・権限の複雑さが生じるため、自己完結させている。
 #
-# workflow_dispatch は動作確認用。実行時に既存のタグ（例: v0.1.2）を
-# 対象ブランチ/タグとして選ぶと GITHUB_REF_NAME がそのタグ名になり、
-# guard-version がそのまま機能する。ブランチを選んで実行した場合は
-# バージョン不一致で安全に失敗する。
+# workflow_dispatch は動作確認用。GitHub は「Use workflow from」で選んだ
+# ref にこのファイル（＝ workflow_dispatch トリガー）が存在しないと手動
+# 実行させてくれないため、過去のタグ（このワークフロー追加前）は選べない。
+# そのため version 入力を手動実行時のバージョン源として使い、main 等の
+# ブランチから実行できるようにしている。
 name: Docker Publish
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "検証用バージョン（vなし。例: 0.1.2。psap --versionの出力と一致させること）"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -38,16 +44,22 @@ jobs:
       - name: 依存関係をインストール（--no-dev）
         run: composer install --no-dev --prefer-dist --no-progress
 
-      - name: タグと psap --version が一致することを確認
+      - name: タグ（または手動入力）と psap --version が一致することを確認
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
         run: |
-          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag_version="${MANUAL_VERSION}"
+          else
+            tag_version="${GITHUB_REF_NAME#v}"
+          fi
           reported_version="$(php bin/psap --version | awk '{print $2}')"
 
-          echo "タグ:            ${GITHUB_REF_NAME} (${tag_version})"
+          echo "対象バージョン:    ${tag_version}"
           echo "psap --version:  ${reported_version}"
 
           if [ "${tag_version}" != "${reported_version}" ]; then
-            echo "::error::タグ ${GITHUB_REF_NAME} と psap --version (${reported_version}) が一致しません。bin/psap のバージョン文字列を更新してタグを打ち直してください。"
+            echo "::error::対象バージョン ${tag_version} と psap --version (${reported_version}) が一致しません。bin/psap のバージョン文字列を更新するか、入力したバージョンを見直してください。"
             exit 1
           fi
 
@@ -76,7 +88,14 @@ jobs:
 
       - name: イメージタグ用のバージョンを算出
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${MANUAL_VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: dist イメージをビルド・push
         uses: docker/build-push-action@v6
