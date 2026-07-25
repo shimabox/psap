@@ -4,11 +4,17 @@
 # guard-version は version-check.yml と同じロジックの意図的な重複実装。
 # workflow_run 等で version-check.yml に依存させるとクロスワークフロー連携
 # 特有のタイミング・権限の複雑さが生じるため、自己完結させている。
+#
+# workflow_dispatch は動作確認用。実行時に既存のタグ（例: v0.1.2）を
+# 対象ブランチ/タグとして選ぶと GITHUB_REF_NAME がそのタグ名になり、
+# guard-version がそのまま機能する。ブランチを選んで実行した場合は
+# バージョン不一致で安全に失敗する。
 name: Docker Publish
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
