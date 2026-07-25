@@ -26,11 +26,18 @@ psap自身を解析した[ポータルのデモ](https://shimabox.github.io/psap
 
 ### 1 インストール
 
-Dockerイメージをビルドします。
+GHCR (GitHub Container Registry) からイメージを取得します。
 
 ```bash
-git clone https://github.com/shimabox/psap.git
-docker build -t psap --target dist -f psap/docker/Dockerfile psap
+docker pull ghcr.io/shimabox/psap:latest
+docker tag ghcr.io/shimabox/psap:latest psap
+```
+
+バージョンを固定したい場合は`latest`の代わりにタグ（例: `0.1.2`）を指定します。
+
+```bash
+docker pull ghcr.io/shimabox/psap:0.1.2
+docker tag ghcr.io/shimabox/psap:0.1.2 psap
 ```
 
 インストールできたことを確認します。
@@ -41,12 +48,24 @@ docker run --rm psap --version
 
 PHP 8.3以降があれば、[Composer](docs/getting-started.md#composer)（`composer global require shimabox/psap`）や[最新リリース](https://github.com/shimabox/psap/releases/latest)の[psap.phar](docs/getting-started.md#phar)でも導入できます。その場合は以降の`docker run --rm -v "$PWD":/workdir psap`を`psap`（pharは`php psap.phar`）へ読み替えてください。
 
-psapはDockerイメージをレジストリで配布していません。新しいバージョンに更新する場合は、ソースを取得し直してイメージを再ビルドしてください。
+新しいバージョンに更新する場合は、`docker pull`で最新イメージを取得し直すだけです。
+
+<details>
+<summary>ソースからビルドしたい場合</summary>
+
+```bash
+git clone https://github.com/shimabox/psap.git
+docker build -t psap --target dist -f psap/docker/Dockerfile psap
+```
+
+更新する場合はソースを取得し直してから再ビルドします。
 
 ```bash
 git -C psap pull
 docker build -t psap --target dist -f psap/docker/Dockerfile psap
 ```
+
+</details>
 
 ### 2 レポートを作る
 
