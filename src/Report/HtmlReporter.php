@@ -669,7 +669,7 @@ final class HtmlReporter implements ReporterInterface
       .summary { width: 100%; }
       .coverage-ledger { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .coverage-ledger div:nth-child(4) { border-top: 1px solid var(--grid); border-left: 0; }
-      .coverage-ledger div:nth-child(5) { border-top: 1px solid var(--grid); }
+      .coverage-ledger div:nth-child(5) { border-top: 1px solid var(--grid); grid-column: 2 / -1; }
       .toolbar { grid-template-columns: 1fr 1fr; }
       .inspector { border-top: 1px solid var(--grid); border-left: 0; }
       .diagnostic-item { grid-template-columns: minmax(230px, 1fr) minmax(220px, 1fr); }
@@ -688,6 +688,7 @@ final class HtmlReporter implements ReporterInterface
       .coverage-ledger div:nth-child(n) { border-top: 1px solid var(--grid); border-left: 0; }
       .coverage-ledger div:nth-child(even) { border-left: 1px solid var(--grid); }
       .coverage-ledger div:nth-child(-n + 2) { border-top: 0; }
+      .coverage-ledger div:last-child { grid-column: 1 / -1; }
       .diagnostic-item { grid-template-columns: 1fr; }
       .diagnostic-cell + .diagnostic-cell { border-top: 1px solid var(--grid); border-left: 0; }
       .diagnostic-cell:last-child { grid-column: auto; }
