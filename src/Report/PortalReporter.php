@@ -541,6 +541,7 @@ final class PortalReporter implements ReporterInterface
       padding: 0;
       max-height: 80vh;
       cursor: grab;
+      touch-action: none;
     }
     .diagram.zoomable.dragging { cursor: grabbing; user-select: none; }
     .diagram.zoomable:fullscreen { height: 100%; max-height: none; border: 0; }
@@ -1153,24 +1154,43 @@ __PSAP_MERMAID_LICENSE__
           dragging = false;
           container.classList.remove('dragging');
         };
+        const startDrag = (clientX, clientY) => {
+          dragging = true;
+          lastX = clientX;
+          lastY = clientY;
+          container.classList.add('dragging');
+        };
+        const moveDrag = (clientX, clientY) => {
+          if (!dragging) return;
+          state.x += clientX - lastX;
+          state.y += clientY - lastY;
+          lastX = clientX;
+          lastY = clientY;
+          apply();
+        };
         container.addEventListener('mousedown', (event) => {
           if (event.button !== 0 || event.target.closest('.zoom-controls') !== null) return;
-          dragging = true;
-          lastX = event.clientX;
-          lastY = event.clientY;
-          container.classList.add('dragging');
+          startDrag(event.clientX, event.clientY);
           event.preventDefault();
         });
-        document.addEventListener('mousemove', (event) => {
-          if (!dragging) return;
-          state.x += event.clientX - lastX;
-          state.y += event.clientY - lastY;
-          lastX = event.clientX;
-          lastY = event.clientY;
-          apply();
-        });
+        document.addEventListener('mousemove', (event) => moveDrag(event.clientX, event.clientY));
         document.addEventListener('mouseup', stopDrag);
         window.addEventListener('blur', stopDrag);
+
+        // Single-finger drag mirrors the mouse path above. touch-action: none
+        // (CSS) plus preventDefault here keep the page from scrolling while the
+        // diagram is being panned.
+        container.addEventListener('touchstart', (event) => {
+          if (event.touches.length !== 1 || event.target.closest('.zoom-controls') !== null) return;
+          startDrag(event.touches[0].clientX, event.touches[0].clientY);
+        }, { passive: true });
+        container.addEventListener('touchmove', (event) => {
+          if (!dragging || event.touches.length !== 1) return;
+          moveDrag(event.touches[0].clientX, event.touches[0].clientY);
+          event.preventDefault();
+        }, { passive: false });
+        container.addEventListener('touchend', stopDrag);
+        container.addEventListener('touchcancel', stopDrag);
 
         apply();
       }
