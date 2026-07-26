@@ -548,6 +548,21 @@ final class PortalReporter implements ReporterInterface
     /* Same as :fullscreen; kept as a separate rule because an unknown
        pseudo-class would invalidate a combined selector list. */
     .diagram.zoomable:-webkit-full-screen { height: 100%; max-height: none; border: 0; }
+    /* CSS-based fullscreen fallback for engines that expose no Fullscreen API on
+       non-<video> elements (e.g. iPhone Safari): the script toggles this class
+       instead of calling the API, turning the container into a fixed-position
+       overlay that covers the viewport. */
+    .diagram.zoomable.fullscreen-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      height: 100%;
+      max-height: none;
+      border: 0;
+    }
+    /* Set alongside .fullscreen-fallback so the page underneath the overlay
+       can't be scrolled while it is open. */
+    body.fullscreen-fallback-open { overflow: hidden; }
     .diagram.zoomable svg { max-width: none; height: auto; display: block; }
     .zoom-controls { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; }
     .zoom-btn {
@@ -1068,6 +1083,16 @@ __PSAP_MERMAID_LICENSE__
       const ZOOM_MAX = 10;
       const ZOOM_NATURAL_HEADROOM = 2;
 
+      // At most one diagram can be in the CSS-based fullscreen fallback (see
+      // initZoomPan below) at a time, so a single module-level Escape-key
+      // listener can exit whichever one is currently active instead of every
+      // instance registering its own. Real fullscreen (the Fullscreen API
+      // branch) needs no such listener: the browser already handles Esc for it.
+      let activeFullscreenFallback = null;
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && activeFullscreenFallback) activeFullscreenFallback.exit();
+      });
+
       // initZoomPan makes a successfully-rendered diagram container zoomable and
       // pannable. The scale/translate transform is applied to the inner <svg>
       // (transform-origin 0 0), never to its text/source, so nothing here changes
@@ -1119,13 +1144,39 @@ __PSAP_MERMAID_LICENSE__
 
         // Fullscreen support including WebKit-prefixed engines (request, exit and
         // element detection must all use the same vendor family). Where neither
-        // API exists (e.g. iPhone Safari) the button is not rendered at all.
+        // API exists (e.g. iPhone Safari) a CSS-based fallback below takes over,
+        // so the button is always shown.
         const requestFullscreen = container.requestFullscreen ?? container.webkitRequestFullscreen;
+        const exitFullscreenFn = document.exitFullscreen ?? document.webkitExitFullscreen;
+
+        const exitFullscreenFallback = () => {
+          container.classList.remove('fullscreen-fallback');
+          document.body.classList.remove('fullscreen-fallback-open');
+          if (activeFullscreenFallback?.exit === exitFullscreenFallback) activeFullscreenFallback = null;
+        };
+        const enterFullscreenFallback = () => {
+          // Only one fallback can be active at a time; exiting whichever one is
+          // currently up keeps that invariant even if a second diagram's button
+          // is clicked without the first one ever losing focus or being Esc'd.
+          activeFullscreenFallback?.exit();
+          container.classList.add('fullscreen-fallback');
+          document.body.classList.add('fullscreen-fallback-open');
+          activeFullscreenFallback = { exit: exitFullscreenFallback };
+        };
+
         const toggleFullscreen = () => {
-          if ((document.fullscreenElement ?? document.webkitFullscreenElement) === container) {
-            (document.exitFullscreen ?? document.webkitExitFullscreen).call(document);
+          if (requestFullscreen && exitFullscreenFn) {
+            if ((document.fullscreenElement ?? document.webkitFullscreenElement) === container) {
+              exitFullscreenFn.call(document);
+            } else {
+              requestFullscreen.call(container);
+            }
+            return;
+          }
+          if (container.classList.contains('fullscreen-fallback')) {
+            exitFullscreenFallback();
           } else {
-            requestFullscreen.call(container);
+            enterFullscreenFallback();
           }
         };
 
@@ -1134,7 +1185,7 @@ __PSAP_MERMAID_LICENSE__
         controls.append(
           zoomButton('+', 'zoomIn', () => zoomAtCenter(ZOOM_STEP)),
           zoomButton('−', 'zoomOut', () => zoomAtCenter(1 / ZOOM_STEP)),
-          ...(requestFullscreen ? [zoomButton('⛶', 'zoomFullscreen', toggleFullscreen)] : []),
+          zoomButton('⛶', 'zoomFullscreen', toggleFullscreen),
           zoomButton(t('zoomReset'), 'zoomReset', reset, 'zoomResetTitle'),
         );
         container.append(controls);

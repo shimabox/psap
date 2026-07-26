@@ -108,12 +108,22 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('.diagram.zoomable:fullscreen', $output);
         self::assertStringContainsString("zoomFullscreen: 'Toggle fullscreen'", $output);
         self::assertStringContainsString("zoomFullscreen: '全画面表示を切り替え'", $output);
-        // WebKit接頭辞環境でも要求・終了・検出・CSSを一貫させ、API皆無ならボタン自体を出さない
+        // WebKit接頭辞環境でも要求・終了・検出・CSSを一貫させる
         self::assertStringContainsString('container.requestFullscreen ?? container.webkitRequestFullscreen', $output);
         self::assertStringContainsString('document.fullscreenElement ?? document.webkitFullscreenElement', $output);
         self::assertStringContainsString('document.exitFullscreen ?? document.webkitExitFullscreen', $output);
         self::assertStringContainsString('.diagram.zoomable:-webkit-full-screen', $output);
-        self::assertStringContainsString('requestFullscreen ? [zoomButton', $output);
+        // Fullscreen API 非対応環境（iPhone Safari 等）でもボタンは常時表示し、CSS の
+        // position: fixed による疑似フルスクリーンへフォールバックする（同時に1つだけアクティブ、Escで閉じる）
+        self::assertStringContainsString("zoomButton('⛶', 'zoomFullscreen', toggleFullscreen)", $output);
+        self::assertStringContainsString('.diagram.zoomable.fullscreen-fallback', $output);
+        self::assertStringContainsString('body.fullscreen-fallback-open { overflow: hidden; }', $output);
+        self::assertStringContainsString('let activeFullscreenFallback = null', $output);
+        self::assertStringContainsString("event.key === 'Escape' && activeFullscreenFallback", $output);
+        self::assertStringContainsString('const enterFullscreenFallback = ()', $output);
+        self::assertStringContainsString('const exitFullscreenFallback = ()', $output);
+        self::assertStringContainsString("container.classList.add('fullscreen-fallback')", $output);
+        self::assertStringContainsString("document.body.classList.add('fullscreen-fallback-open')", $output);
         // 記号ボタンにも aria-label を付ける（言語切替にも追従）
         self::assertStringContainsString("button.setAttribute('aria-label', t(labelKey))", $output);
         self::assertStringContainsString('button.dataset.i18nAriaLabel = labelKey', $output);
