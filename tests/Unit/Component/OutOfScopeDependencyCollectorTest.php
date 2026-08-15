@@ -170,6 +170,70 @@ final class OutOfScopeDependencyCollectorTest extends TestCase
         self::assertSame(2, $report->groups[0]->sourceCount());
     }
 
+    public function testDoesNotDoubleCountFqcnsThatDifferOnlyInCase(): void
+    {
+        // PHP のクラス名は大文字小文字を区別しないため、クラス名・名前空間どちらの
+        // 表記ゆれも同一の依存として1グループ・1件に集計する
+        $components = [
+            $this->component('App\\Http', [
+                $this->classInfo('App\\Http\\Controller', [
+                    'Vendor\\Support\\Facades\\DB',
+                    'Vendor\\Support\\Facades\\db',
+                    'vendor\\support\\facades\\DB',
+                    'VENDOR\\SUPPORT\\FACADES\\Db',
+                ]),
+            ]),
+        ];
+
+        $report = (new OutOfScopeDependencyCollector())->collect($components);
+
+        self::assertSame(1, $report->groupCount());
+        self::assertSame(1, $report->dependencyCount());
+        // 表示は最初に現れた表記を採用する
+        self::assertSame('Vendor\\Support\\Facades', $report->groups[0]->namespace);
+        self::assertSame(['Vendor\\Support\\Facades\\DB'], $report->groups[0]->targetFqcns);
+        self::assertSame(1, $report->components[0]->groupCount());
+        self::assertSame(1, $report->components[0]->dependencyCount());
+    }
+
+    public function testDoesNotDoubleCountAcrossComponentsWhenNamespaceCaseDiffers(): void
+    {
+        $components = [
+            $this->component('App\\Http', [
+                $this->classInfo('App\\Http\\Controller', ['Vendor\\Support\\Facades\\DB']),
+            ]),
+            $this->component('App\\Domain', [
+                $this->classInfo('App\\Domain\\Order', ['vendor\\support\\facades\\db']),
+            ]),
+        ];
+
+        $report = (new OutOfScopeDependencyCollector())->collect($components);
+
+        self::assertSame(1, $report->groupCount());
+        self::assertSame(1, $report->dependencyCount());
+        self::assertSame(2, $report->groups[0]->sourceCount());
+        self::assertSame(['Vendor\\Support\\Facades\\DB'], $report->groups[0]->targetFqcns);
+    }
+
+    public function testDoesNotDoubleCountReferencingClassesThatDifferOnlyInCase(): void
+    {
+        $components = [
+            $this->component('App\\Http', [
+                $this->classInfo('App\\Http\\Controller', ['Vendor\\Log\\Logger'], [
+                    new DependencyEvidence('Vendor\\Log\\Logger', DependencyKind::StaticCall, 'Http/Controller.php', 12),
+                    // 同じ依存を別表記で拾っても証拠は重複させない
+                    new DependencyEvidence('vendor\\log\\logger', DependencyKind::StaticCall, 'Http/Controller.php', 12),
+                ]),
+            ]),
+        ];
+
+        $report = (new OutOfScopeDependencyCollector())->collect($components);
+
+        self::assertSame(1, $report->dependencyCount());
+        self::assertSame(1, $report->groups[0]->sourceCount());
+        self::assertCount(1, $report->groups[0]->evidence);
+    }
+
     public function testSortsGroupsByCountDescendingThenNamespaceAscending(): void
     {
         $components = [

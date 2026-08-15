@@ -19,6 +19,9 @@ use ReflectionClass;
  * 集計から除外する。判定では autoload を一切走らせない（psap 自身の vendor を
  * 誤って解決してしまう事故を防ぐため）。
  *
+ * PHP のクラス名は大文字小文字を区別しないため、FQCN・名前空間の同一性判定は
+ * すべて小文字化したキーで行う（表示に使う文字列は最初に現れた表記を採用する）。
+ *
  * 返す集計はすべて決定的にソート済みで、表示件数の制限は行わない（Reporter の責務）。
  */
 final class OutOfScopeDependencyCollector
@@ -33,12 +36,12 @@ final class OutOfScopeDependencyCollector
     {
         $inScopeFqcns = $this->buildInScopeMap($components);
 
-        /** @var array<string, array{targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $projectGroups */
+        /** @var array<string, array{namespace: string, targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $projectGroups */
         $projectGroups = [];
         $componentReports = [];
 
         foreach ($components as $component) {
-            /** @var array<string, array{targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $componentGroups */
+            /** @var array<string, array{namespace: string, targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $componentGroups */
             $componentGroups = [];
 
             foreach ($component->classInfos as $classInfo) {
@@ -122,9 +125,13 @@ final class OutOfScopeDependencyCollector
     }
 
     /**
-     * @param array<string, array{targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $groups
+     * PHP のクラス名は大文字小文字を区別しないため、グループ・依存先・参照元のいずれも
+     * 小文字化した FQCN をキーにして同一性を判定する（buildInScopeMap と同じ考え方）。
+     * 表示に使う文字列は最初に現れた表記を採用する（走査順が決定的なので結果も決定的になる）。
+     *
+     * @param array<string, array{namespace: string, targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $groups
      * @param list<OutOfScopeDependencyEvidence> $evidence
-     * @param-out array<string, array{targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $groups
+     * @param-out array<string, array{namespace: string, targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $groups
      */
     private function accumulate(
         array &$groups,
@@ -133,9 +140,15 @@ final class OutOfScopeDependencyCollector
         string $targetFqcn,
         array $evidence,
     ): void {
-        $groups[$namespace] ??= ['targets' => [], 'sources' => [], 'evidence' => []];
-        $groups[$namespace]['targets'][strtolower($targetFqcn)] ??= $targetFqcn;
-        $groups[$namespace]['sources'][strtolower($sourceFqcn)] ??= $sourceFqcn;
+        $namespaceKey = strtolower($namespace);
+        $groups[$namespaceKey] ??= [
+            'namespace' => $namespace,
+            'targets' => [],
+            'sources' => [],
+            'evidence' => [],
+        ];
+        $groups[$namespaceKey]['targets'][strtolower($targetFqcn)] ??= $targetFqcn;
+        $groups[$namespaceKey]['sources'][strtolower($sourceFqcn)] ??= $sourceFqcn;
 
         foreach ($evidence as $item) {
             $key = implode("\0", [
@@ -145,18 +158,18 @@ final class OutOfScopeDependencyCollector
                 $item->file,
                 (string) $item->line,
             ]);
-            $groups[$namespace]['evidence'][$key] = $item;
+            $groups[$namespaceKey]['evidence'][$key] = $item;
         }
     }
 
     /**
-     * @param array<string, array{targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $groups
+     * @param array<string, array{namespace: string, targets: array<string, string>, sources: array<string, string>, evidence: array<string, OutOfScopeDependencyEvidence>}> $groups
      * @return list<OutOfScopeDependencyGroup>
      */
     private function finalizeGroups(array $groups): array
     {
         $finalized = [];
-        foreach ($groups as $namespace => $group) {
+        foreach ($groups as $group) {
             $targets = array_values($group['targets']);
             sort($targets);
             $sources = array_values($group['sources']);
@@ -180,7 +193,7 @@ final class OutOfScopeDependencyCollector
                 ],
             );
 
-            $finalized[] = new OutOfScopeDependencyGroup((string) $namespace, $targets, $sources, $evidence);
+            $finalized[] = new OutOfScopeDependencyGroup($group['namespace'], $targets, $sources, $evidence);
         }
 
         // 件数降順 → 名前昇順。同値でも順序が揺れないタイブレークを入れて決定的にする
