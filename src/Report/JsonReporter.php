@@ -6,6 +6,9 @@ namespace Psap\Report;
 
 use JsonException;
 use Psap\Analyzer\ClassInfo;
+use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyEvidence;
+use Psap\Component\OutOfScopeDependencyGroup;
 use Psap\Diagnostic\Diagnostic;
 use Psap\Diagnostic\DiagnosticAction;
 use Psap\Diagnostic\DiagnosticFormatter;
@@ -34,6 +37,7 @@ final class JsonReporter implements ReporterInterface
             ],
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
             'dependencies' => $data->dependencyGraph->edgeDetails,
+            'outOfScopeDependencies' => $this->outOfScopeDependenciesPayload($data),
             'cycles' => $data->cycles,
             'cyclePaths' => $data->cyclePathDetails(),
             'cycleGroups' => $data->cycleGroups(),
@@ -93,6 +97,92 @@ final class JsonReporter implements ReporterInterface
             'distance' => $metrics->dependencyMetricsEvaluable ? round($metrics->distance, self::ROUND_PRECISION) : null,
             'zone' => $this->zoneValue($metrics->zone),
             'classes' => array_map($this->classPayload(...), $metrics->component->classInfos),
+        ];
+    }
+
+    /**
+     * 解析対象外依存。0件でもキーと空配列を必ず出す（スキーマを安定させるため）。
+     *
+     * `dependencyCount` はプロジェクト全体で distinct な FQCN 数であり、
+     * `components[].dependencyCount` の単純合計とは一致しない（同じ FQCN を
+     * 複数コンポーネントから参照していても全体では1件と数えるため）。
+     * 証拠は `components[].groups[].evidence` に全量が入る（`groups` は全体サマリなので持たない）。
+     *
+     * @return array{
+     *     dependencyCount: int,
+     *     groupCount: int,
+     *     groups: list<array{namespace: string, dependencyCount: int, sourceCount: int, targets: list<string>}>,
+     *     components: list<array{
+     *         name: string,
+     *         dependencyCount: int,
+     *         groupCount: int,
+     *         groups: list<array{
+     *             namespace: string,
+     *             dependencyCount: int,
+     *             sourceCount: int,
+     *             targets: list<string>,
+     *             sources: list<string>,
+     *             evidence: list<array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}>,
+     *         }>,
+     *     }>,
+     * }
+     */
+    private function outOfScopeDependenciesPayload(ReportData $data): array
+    {
+        $report = $data->outOfScopeDependencies;
+
+        return [
+            'dependencyCount' => $report->dependencyCount(),
+            'groupCount' => $report->groupCount(),
+            'groups' => array_map(
+                static fn (OutOfScopeDependencyGroup $group): array => [
+                    'namespace' => $group->namespace,
+                    'dependencyCount' => $group->dependencyCount(),
+                    'sourceCount' => $group->sourceCount(),
+                    'targets' => $group->targetFqcns,
+                ],
+                $report->groups,
+            ),
+            'components' => array_map(
+                fn (OutOfScopeDependencyComponent $component): array => [
+                    'name' => $component->name,
+                    'dependencyCount' => $component->dependencyCount(),
+                    'groupCount' => $component->groupCount(),
+                    'groups' => array_map($this->outOfScopeGroupPayload(...), $component->groups),
+                ],
+                $report->components,
+            ),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     namespace: string,
+     *     dependencyCount: int,
+     *     sourceCount: int,
+     *     targets: list<string>,
+     *     sources: list<string>,
+     *     evidence: list<array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}>,
+     * }
+     */
+    private function outOfScopeGroupPayload(OutOfScopeDependencyGroup $group): array
+    {
+        return [
+            'namespace' => $group->namespace,
+            'dependencyCount' => $group->dependencyCount(),
+            'sourceCount' => $group->sourceCount(),
+            'targets' => $group->targetFqcns,
+            'sources' => $group->sourceFqcns,
+            'evidence' => array_map(
+                static fn (OutOfScopeDependencyEvidence $evidence): array => [
+                    'sourceFqcn' => $evidence->sourceFqcn,
+                    'targetFqcn' => $evidence->targetFqcn,
+                    'kind' => $evidence->kind->value,
+                    'file' => $evidence->file,
+                    'line' => $evidence->line,
+                ],
+                $group->evidence,
+            ),
         ];
     }
 

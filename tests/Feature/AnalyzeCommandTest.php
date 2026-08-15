@@ -40,6 +40,24 @@ use Symfony\Component\Console\Tester\CommandTester;
  *         classes: list<array{fqcn: string, kind: string}>,
  *     }>,
  *     dependencies: list<Dependency>,
+ *     outOfScopeDependencies: array{
+ *         dependencyCount: int,
+ *         groupCount: int,
+ *         groups: list<array{namespace: string, dependencyCount: int, sourceCount: int, targets: list<string>}>,
+ *         components: list<array{
+ *             name: string,
+ *             dependencyCount: int,
+ *             groupCount: int,
+ *             groups: list<array{
+ *                 namespace: string,
+ *                 dependencyCount: int,
+ *                 sourceCount: int,
+ *                 targets: list<string>,
+ *                 sources: list<string>,
+ *                 evidence: list<array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}>,
+ *             }>,
+ *         }>,
+ *     },
  *     cycles: list<list<string>>,
  *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
  *     cycleGroups: list<CycleGroup>,
@@ -64,6 +82,7 @@ final class AnalyzeCommandTest extends TestCase
     private const DOCBLOCK_ONLY_PROJECT = __DIR__ . '/../Fixtures/DocblockOnlyProject';
     private const BROKEN_PROJECT = __DIR__ . '/../Fixtures/BrokenProject';
     private const FUNCTION_ONLY_PROJECT = __DIR__ . '/../Fixtures/FunctionOnlyProject';
+    private const OUT_OF_SCOPE_PROJECT = __DIR__ . '/../Fixtures/OutOfScopeProject';
 
     public function testTextFormatRendersTableAndExitsSuccessfully(): void
     {
@@ -690,6 +709,185 @@ final class AnalyzeCommandTest extends TestCase
         $domainWithoutDocblock = $this->findComponent($decodedWithoutDocblock, 'Fixture\\DocblockOnlyProject\\Domain');
 
         self::assertSame(0, $domainWithoutDocblock['ce']);
+    }
+
+    public function testReportsOutOfScopeDependenciesIdenticallyInTextMarkdownAndJson(): void
+    {
+        $decoded = $this->decodeJson($this->render(['--format' => 'json']));
+        $outOfScope = $decoded['outOfScopeDependencies'];
+
+        // 全体は distinct な FQCN 数（DB / Cache / Logger / GlobalFacade）で、
+        // コンポーネント別の単純合計（4 + 1）とは一致しない
+        self::assertSame(4, $outOfScope['dependencyCount']);
+        self::assertSame(3, $outOfScope['groupCount']);
+        self::assertSame(
+            ['Fixture\\Vendor\\Support\\Facades', '(global)', 'Fixture\\Vendor\\Log'],
+            array_column($outOfScope['groups'], 'namespace'),
+        );
+        self::assertSame(
+            ['Fixture\\OutOfScope\\Http', 'Fixture\\OutOfScope\\Domain'],
+            array_column($outOfScope['components'], 'name'),
+        );
+        self::assertSame(4, $outOfScope['components'][0]['dependencyCount']);
+        self::assertSame(1, $outOfScope['components'][1]['dependencyCount']);
+        self::assertSame([
+            'sourceFqcn' => 'Fixture\\OutOfScope\\Domain\\Report',
+            'targetFqcn' => 'Fixture\\Vendor\\Support\\Facades\\DB',
+            'kind' => 'static_call',
+            'file' => 'Domain/Report.php',
+            'line' => 21,
+        ], $outOfScope['components'][1]['groups'][0]['evidence'][0]);
+
+        $text = $this->render([], verbosity: OutputInterface::VERBOSITY_VERBOSE);
+        self::assertStringContainsString('Dependencies outside analysis scope: 4 classes in 3 namespaces', $text);
+        self::assertStringContainsString('  - Fixture\\Vendor\\Support\\Facades: 2 classes referenced by 2 classes', $text);
+        self::assertStringContainsString('  - (global): 1 class referenced by 1 class', $text);
+        self::assertStringContainsString('  Fixture\\OutOfScope\\Http (4 classes):', $text);
+        self::assertStringContainsString('  Fixture\\OutOfScope\\Domain (1 class):', $text);
+        self::assertStringContainsString(
+            'Fixture\\OutOfScope\\Domain\\Report -> Fixture\\Vendor\\Support\\Facades\\DB (static_call) at Domain/Report.php:21',
+            $text,
+        );
+
+        $markdown = $this->render(['--format' => 'markdown']);
+        self::assertStringContainsString('## Dependencies outside analysis scope', $markdown);
+        self::assertStringContainsString('Distinct classes outside the analysis scope 4 in 3 namespaces.', $markdown);
+        self::assertStringContainsString('| `Fixture\\Vendor\\Support\\Facades` | 2 | 2 |', $markdown);
+        self::assertStringContainsString('| `(global)` | 1 | 1 |', $markdown);
+        self::assertStringContainsString('### `Fixture\\OutOfScope\\Domain`', $markdown);
+        self::assertStringContainsString(
+            '`Fixture\\OutOfScope\\Domain\\Report` to `Fixture\\Vendor\\Support\\Facades\\DB` using `static_call` at `Domain/Report.php:21`',
+            $markdown,
+        );
+    }
+
+    public function testTextFormatShowsOnlyOutOfScopeSummaryWithoutVerbose(): void
+    {
+        $text = $this->render([]);
+
+        self::assertStringContainsString('Dependencies outside analysis scope: 4 classes in 3 namespaces', $text);
+        self::assertStringNotContainsString('Fixture\\OutOfScope\\Http (4 classes):', $text);
+        self::assertStringNotContainsString('Domain/Report.php:21', $text);
+    }
+
+    public function testDoesNotReportPhpBuiltInTypesAsOutOfScopeDependencies(): void
+    {
+        // OutOfScopeProject は DateTimeImmutable / Countable / RuntimeException も参照しているが、
+        // いずれも PHP 組み込みなので集計に出ない
+        $outOfScope = $this->decodeJson($this->render(['--format' => 'json']))['outOfScopeDependencies'];
+
+        self::assertSame([
+            'Fixture\\Vendor\\Support\\Facades\\Cache',
+            'Fixture\\Vendor\\Support\\Facades\\DB',
+            'GlobalFacade',
+            'Fixture\\Vendor\\Log\\Logger',
+        ], array_merge(...array_column($outOfScope['groups'], 'targets')));
+
+        // SimpleProject は Exception / RuntimeException / Countable / ArrayAccess /
+        // DateTimeImmutable / Attribute を参照しているが、解析対象外依存は0件になる
+        $simple = $this->commandTester();
+        $simple->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'json']);
+        $simpleOutOfScope = $this->decodeJson($simple->getDisplay())['outOfScopeDependencies'];
+
+        self::assertSame(0, $simpleOutOfScope['dependencyCount']);
+        self::assertSame([], $simpleOutOfScope['groups']);
+        self::assertSame([], $simpleOutOfScope['components']);
+    }
+
+    public function testDoesNotTriggerAutoloadForOutOfScopeFqcns(): void
+    {
+        // 解析に必要なクラスを先に読み込ませ、検知対象を解析対象外 FQCN の解決だけにする
+        $this->render(['--format' => 'json']);
+
+        $requested = [];
+        $spy = static function (string $class) use (&$requested): void {
+            $requested[] = $class;
+        };
+        spl_autoload_register($spy);
+
+        try {
+            $this->render(['--format' => 'json']);
+        } finally {
+            spl_autoload_unregister($spy);
+        }
+
+        self::assertSame([], $requested);
+    }
+
+    public function testOutOfScopeDependencyOrderIsDeterministic(): void
+    {
+        $first = $this->render(['--format' => 'json']);
+        $second = $this->render(['--format' => 'json']);
+        $firstText = $this->render([], verbosity: OutputInterface::VERBOSITY_VERBOSE);
+        $secondText = $this->render([], verbosity: OutputInterface::VERBOSITY_VERBOSE);
+
+        self::assertSame($first, $second);
+        self::assertSame($firstText, $secondText);
+    }
+
+    public function testMetricsAndCycleDetectionAreUnaffectedByOutOfScopeCollection(): void
+    {
+        $simple = $this->commandTester();
+        $simpleExitCode = $simple->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'json']);
+        $simpleDecoded = $this->decodeJson($simple->getDisplay());
+
+        self::assertSame(Command::SUCCESS, $simpleExitCode);
+        self::assertSame([
+            ['(global)', 0, 0],
+            ['Fixture\\App\\Domain', 1, 0],
+            ['Fixture\\App\\Generated', 0, 0],
+            ['Fixture\\App\\Infra', 0, 1],
+        ], array_map(
+            static fn (array $component): array => [$component['name'], $component['ca'], $component['ce']],
+            $simpleDecoded['components'],
+        ));
+        self::assertSame([], $simpleDecoded['cycles']);
+
+        $cyclic = $this->commandTester();
+        $cyclicExitCode = $cyclic->execute([
+            'paths' => [self::CYCLIC_PROJECT],
+            '--depth' => '3',
+            '--format' => 'json',
+        ]);
+        $cyclicDecoded = $this->decodeJson($cyclic->getDisplay());
+
+        self::assertSame(Command::SUCCESS, $cyclicExitCode);
+        self::assertSame([
+            ['Fixture\\Cyclic\\A', 1, 1, 0.5],
+            ['Fixture\\Cyclic\\B', 1, 1, 0.5],
+            ['Fixture\\Cyclic\\C', 1, 1, 0.5],
+            ['Fixture\\Cyclic\\D', 1, 1, 0.5],
+            ['Fixture\\Cyclic\\E', 1, 1, 0.5],
+        ], array_map(
+            static fn (array $component): array => [
+                $component['name'],
+                $component['ca'],
+                $component['ce'],
+                $component['distance'],
+            ],
+            $cyclicDecoded['components'],
+        ));
+        self::assertSame([
+            ['Fixture\\Cyclic\\A', 'Fixture\\Cyclic\\B'],
+            ['Fixture\\Cyclic\\C', 'Fixture\\Cyclic\\D', 'Fixture\\Cyclic\\E'],
+        ], $cyclicDecoded['cycles']);
+    }
+
+    /**
+     * OutOfScopeProject を解析して標準出力の内容を返す。
+     *
+     * @param array<string, string> $options
+     */
+    private function render(array $options, int $verbosity = OutputInterface::VERBOSITY_NORMAL): string
+    {
+        $tester = $this->commandTester();
+        $exitCode = $tester->execute(
+            ['paths' => [self::OUT_OF_SCOPE_PROJECT], ...$options],
+            ['verbosity' => $verbosity],
+        );
+        self::assertSame(Command::SUCCESS, $exitCode);
+
+        return $tester->getDisplay();
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psap\Report;
 
+use Psap\Component\OutOfScopeDependencyGroup;
 use Psap\Diagnostic\DiagnosticFormatter;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\Zone;
@@ -18,6 +19,9 @@ final class MarkdownReporter implements ReporterInterface
     private const int CYCLE_CLASS_DEPENDENCY_LIMIT = 10;
     private const int CYCLE_EVIDENCE_LIMIT = 5;
 
+    /** 解析対象外依存で名前空間グループごとに表示する代表証拠の上限 */
+    private const int OUT_OF_SCOPE_EVIDENCE_LIMIT = 3;
+
     public function render(ReportData $data): string
     {
         return implode("\n", [
@@ -26,6 +30,7 @@ final class MarkdownReporter implements ReporterInterface
             ...$this->baselineChanges($data),
             ...$this->cycles($data),
             ...$this->dependencyHotspots($data),
+            ...$this->outOfScopeDependencies($data),
             ...$this->metrics($data),
             ...$this->diagnostics($data),
             ...$this->warnings($data),
@@ -279,6 +284,91 @@ final class MarkdownReporter implements ReporterInterface
         return $lines;
     }
 
+    /**
+     * 解析対象外依存。0件でも見出しは必ず出す（レポートの構成を安定させるため）。
+     *
+     * @return list<string>
+     */
+    private function outOfScopeDependencies(ReportData $data): array
+    {
+        $report = $data->outOfScopeDependencies;
+        $lines = ['## Dependencies outside analysis scope', ''];
+
+        if ($report->isEmpty()) {
+            return [...$lines, '0 (None)', ''];
+        }
+
+        $lines[] = sprintf(
+            'Distinct classes outside the analysis scope %d in %d namespace%s. These are excluded from Ca, Ce, I, A and D.',
+            $report->dependencyCount(),
+            $report->groupCount(),
+            $report->groupCount() === 1 ? '' : 's',
+        );
+        $lines[] = '';
+        $lines[] = '| Namespace | Classes | Referencing classes |';
+        $lines[] = '|---|---:|---:|';
+        foreach ($report->groups as $group) {
+            $lines[] = sprintf(
+                '| %s | %d | %d |',
+                $this->code($group->namespace),
+                $group->dependencyCount(),
+                $group->sourceCount(),
+            );
+        }
+        $lines[] = '';
+
+        foreach ($report->components as $component) {
+            $lines[] = sprintf('### %s', $this->code($component->name));
+            $lines[] = '';
+            $lines[] = '| Namespace | Classes | Referencing classes |';
+            $lines[] = '|---|---:|---:|';
+            foreach ($component->groups as $group) {
+                $lines[] = sprintf(
+                    '| %s | %d | %d |',
+                    $this->code($group->namespace),
+                    $group->dependencyCount(),
+                    $group->sourceCount(),
+                );
+            }
+            $lines[] = '';
+            foreach ($component->groups as $group) {
+                $lines = [...$lines, ...$this->outOfScopeGroupEvidence($group)];
+            }
+        }
+
+        return $lines;
+    }
+
+    /** @return list<string> */
+    private function outOfScopeGroupEvidence(OutOfScopeDependencyGroup $group): array
+    {
+        if ($group->evidence === []) {
+            return [
+                sprintf('- %s no source evidence available', $this->code($group->namespace)),
+                '',
+            ];
+        }
+
+        $lines = [sprintf('- %s', $this->code($group->namespace))];
+        $visibleEvidence = array_slice($group->evidence, 0, self::OUT_OF_SCOPE_EVIDENCE_LIMIT);
+        foreach ($visibleEvidence as $evidence) {
+            $lines[] = sprintf(
+                '  - %s to %s using `%s` at %s',
+                $this->code($evidence->sourceFqcn),
+                $this->code($evidence->targetFqcn),
+                $evidence->kind->value,
+                $this->location($evidence->file, $evidence->line),
+            );
+        }
+        $remaining = count($group->evidence) - count($visibleEvidence);
+        if ($remaining > 0) {
+            $lines[] = sprintf('  - %d additional source location%s omitted', $remaining, $remaining === 1 ? '' : 's');
+        }
+        $lines[] = '';
+
+        return $lines;
+    }
+
     /** @return list<string> */
     private function metrics(ReportData $data): array
     {
@@ -366,6 +456,7 @@ final class MarkdownReporter implements ReporterInterface
             '- I is instability, A is abstractness, and D is distance from the main sequence.',
             '- A cycle group is a strongly connected component. The representative path is one shortest concrete loop and may omit other members.',
             '- Source evidence identifies why a class dependency exists. Multiple syntax kinds or locations can support the same dependency.',
+            '- Dependencies outside analysis scope are references to classes that are not part of the analyzed set. They do not affect Ca, Ce, I, A or D. PHP built-in types are excluded from that count.',
         ];
     }
 

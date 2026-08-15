@@ -13,6 +13,7 @@ use Psap\Component\ComponentClassifier;
 use Psap\Component\ComponentDepthResolver;
 use Psap\Component\CycleDetector;
 use Psap\Component\DependencyGraph;
+use Psap\Component\OutOfScopeDependencyCollector;
 use Psap\Diagnostic\Diagnostic;
 use Psap\Diagnostic\DiagnosticAction;
 use Psap\Diagnostic\DiagnosticCode;
@@ -231,6 +232,7 @@ final class AnalyzeCommand extends Command
         $summary = MetricsSummary::from($componentMetrics);
         $dependencyGraph = DependencyGraph::fromComponents($components);
         $cycles = (new CycleDetector())->detect($dependencyGraph);
+        $outOfScopeDependencies = (new OutOfScopeDependencyCollector())->collect($components);
 
         $cycleBaselineComparison = null;
         if ($cycleBaseline !== null) {
@@ -286,18 +288,19 @@ final class AnalyzeCommand extends Command
         }
 
         $reportData = new ReportData(
-            $componentMetrics,
-            $summary,
-            [],
-            $cycles,
-            $dependencyGraph,
-            $depth,
-            $cycleBaselineComparison,
-            $paths,
-            !$noDocblock,
-            $excludePatterns,
-            $analysisCoverage,
-            $diagnostics,
+            componentMetrics: $componentMetrics,
+            summary: $summary,
+            warnings: [],
+            cycles: $cycles,
+            dependencyGraph: $dependencyGraph,
+            namespaceDepth: $depth,
+            cycleBaselineComparison: $cycleBaselineComparison,
+            sourcePaths: $paths,
+            docblockEnabled: !$noDocblock,
+            excludePatterns: $excludePatterns,
+            analysisCoverage: $analysisCoverage,
+            diagnostics: $diagnostics,
+            outOfScopeDependencies: $outOfScopeDependencies,
         );
         $reporter = $reporterFactory($output->isVerbose());
         $rendered = $reporter->render($reportData);

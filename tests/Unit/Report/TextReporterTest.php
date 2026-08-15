@@ -7,10 +7,15 @@ namespace Psap\Tests\Unit\Report;
 use PHPUnit\Framework\TestCase;
 use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyKind;
 use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyEvidence;
+use Psap\Component\OutOfScopeDependencyGroup;
+use Psap\Component\OutOfScopeDependencyReport;
 use Psap\Diagnostic\Diagnostic;
 use Psap\Diagnostic\DiagnosticAction;
 use Psap\Diagnostic\DiagnosticCode;
@@ -387,6 +392,110 @@ final class TextReporterTest extends TestCase
         self::assertSame(mb_strlen($headerLine), mb_strlen($rowShort) + mb_strlen('  Zone'));
         // データ行同士は、コンポーネント名の長さが違っても列幅が揃っているため同じ長さになる
         self::assertSame(mb_strlen($rowShort), mb_strlen($rowLong));
+    }
+
+    public function testRendersOutOfScopeSummaryOnlyWithoutVerbose(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            outOfScopeDependencies: $this->outOfScopeReport(),
+        );
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('Dependencies outside analysis scope: 3 classes in 2 namespaces', $output);
+        self::assertStringContainsString('  - Vendor\\Support\\Facades: 2 classes referenced by 2 classes', $output);
+        self::assertStringContainsString('  - (global): 1 class referenced by 1 class', $output);
+        // 通常時はコンポーネント別詳細と証拠を出さない
+        self::assertStringNotContainsString('App\\Http (', $output);
+        self::assertStringNotContainsString('Http/Controller.php:12', $output);
+    }
+
+    public function testRendersOutOfScopeComponentDetailAndEvidenceWhenVerbose(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            outOfScopeDependencies: $this->outOfScopeReport(),
+        );
+
+        $output = (new TextReporter(verbose: true))->render($data);
+
+        self::assertStringContainsString('  App\\Http (2 classes):', $output);
+        self::assertStringContainsString('    - Vendor\\Support\\Facades: 1 class referenced by 1 class', $output);
+        self::assertStringContainsString(
+            '        App\\Http\\Controller -> Vendor\\Support\\Facades\\DB (static_call) at Http/Controller.php:12',
+            $output,
+        );
+    }
+
+    public function testRendersZeroOutOfScopeSummaryWhenNothingIsOutOfScope(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), []);
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('Dependencies outside analysis scope: 0 classes in 0 namespaces', $output);
+    }
+
+    public function testLimitsOutOfScopeGroupsWithoutVerbose(): void
+    {
+        $groups = [];
+        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $namespace) {
+            $groups[] = new OutOfScopeDependencyGroup(
+                'Vendor\\' . $namespace,
+                ['Vendor\\' . $namespace . '\\One'],
+                ['App\\Http\\Controller'],
+                [],
+            );
+        }
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            outOfScopeDependencies: new OutOfScopeDependencyReport($groups, []),
+        );
+
+        $output = (new TextReporter())->render($data);
+
+        self::assertStringContainsString('  - Vendor\\E: 1 class referenced by 1 class', $output);
+        self::assertStringNotContainsString('  - Vendor\\F:', $output);
+        self::assertStringContainsString('  ... and 1 more namespaces', $output);
+    }
+
+    private function outOfScopeReport(): OutOfScopeDependencyReport
+    {
+        return new OutOfScopeDependencyReport(
+            groups: [
+                new OutOfScopeDependencyGroup(
+                    'Vendor\\Support\\Facades',
+                    ['Vendor\\Support\\Facades\\Cache', 'Vendor\\Support\\Facades\\DB'],
+                    ['App\\Domain\\Order', 'App\\Http\\Controller'],
+                    [],
+                ),
+                new OutOfScopeDependencyGroup('(global)', ['GlobalFacade'], ['App\\Http\\Controller'], []),
+            ],
+            components: [
+                new OutOfScopeDependencyComponent('App\\Http', [
+                    new OutOfScopeDependencyGroup(
+                        'Vendor\\Support\\Facades',
+                        ['Vendor\\Support\\Facades\\DB'],
+                        ['App\\Http\\Controller'],
+                        [new OutOfScopeDependencyEvidence(
+                            'App\\Http\\Controller',
+                            'Vendor\\Support\\Facades\\DB',
+                            DependencyKind::StaticCall,
+                            'Http/Controller.php',
+                            12,
+                        )],
+                    ),
+                    new OutOfScopeDependencyGroup('(global)', ['GlobalFacade'], ['App\\Http\\Controller'], []),
+                ]),
+            ],
+        );
     }
 
     /**

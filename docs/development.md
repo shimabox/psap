@@ -23,6 +23,8 @@ make build-plantuml
 SourceFinder -> DependencyAnalyzer -> ComponentClassifier -> MetricsCalculator -> Reporter
                                           |
                                           +-> DependencyGraph -> CycleDetector
+                                          |
+                                          +-> OutOfScopeDependencyCollector
 ```
 
 解析、分類、計測、出力を分けています。新しい出力形式は`ReporterInterface`を実装し、`AnalyzeCommand`のファクトリへ追加します。
