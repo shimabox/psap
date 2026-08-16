@@ -8,3 +8,16 @@ services:
     working_dir: /app
     volumes:
       - .:/app
+  # PHP CS Fixer 専用。最低対応バージョン（composer.json の "php": "^8.3"）で
+  # 実行しないと警告が出るうえ、cs:fix が 8.3 に無い構文を前提にした整形を
+  # 入れ得るため、dev と同じステージを PHP 8.3 でビルドして使う
+  cs:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: dev
+      args:
+        PHP_VERSION: "8.3"
+    working_dir: /app
+    volumes:
+      - .:/app
