@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Psap\Component;
 
+use JsonSerializable;
+
 /**
  * 1コンポーネントぶんの解析対象外依存の集計。
  */
-final readonly class OutOfScopeDependencyComponent
+final readonly class OutOfScopeDependencyComponent implements JsonSerializable
 {
     /**
      * @param string $name コンポーネント名
@@ -34,5 +36,35 @@ final readonly class OutOfScopeDependencyComponent
     public function groupCount(): int
     {
         return count($this->groups);
+    }
+
+    /**
+     * コンポーネント別の詳細形式。名前空間グループは参照元と証拠を含む詳細形式で持つ。
+     *
+     * @return array{
+     *     name: string,
+     *     dependencyCount: int,
+     *     groupCount: int,
+     *     groups: list<array{
+     *         namespace: string,
+     *         dependencyCount: int,
+     *         sourceCount: int,
+     *         targets: list<string>,
+     *         sources: list<string>,
+     *         evidence: list<array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}>,
+     *     }>,
+     * }
+     */
+    public function jsonSerialize(): array
+    {
+        return [
+            'name' => $this->name,
+            'dependencyCount' => $this->dependencyCount(),
+            'groupCount' => $this->groupCount(),
+            'groups' => array_map(
+                static fn (OutOfScopeDependencyGroup $group): array => $group->jsonSerialize(),
+                $this->groups,
+            ),
+        ];
     }
 }

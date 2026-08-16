@@ -7,9 +7,14 @@ namespace Psap\Tests\Unit\Report;
 use JsonException;
 use PHPUnit\Framework\TestCase;
 use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyKind;
 use Psap\Analyzer\TypeKind;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyEvidence;
+use Psap\Component\OutOfScopeDependencyGroup;
+use Psap\Component\OutOfScopeDependencyReport;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
 use Psap\Metrics\Zone;
@@ -279,6 +284,63 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString('data-i18n="worstDistanceHeading"', $output);
     }
 
+    public function testOverviewRendersOutOfScopeStatCardAndSectionWithinFixedLimits(): void
+    {
+        $data = $this->outOfScopeData(groupCount: 13, componentCount: 12, evidenceCount: 5);
+
+        $output = (new PortalReporter())->render($data);
+        $overview = $this->overview($output);
+
+        // 統計カード（5枚目）。5列レイアウトへ切り替える
+        self::assertStringContainsString('<dl class="stat-grid summary">', $output);
+        self::assertStringContainsString('<dt data-i18n="outOfScopeDependencies">', $overview);
+        self::assertStringContainsString('.stat-grid.ledger, .stat-grid.summary {', $output);
+
+        // 全体サマリと Interactive I/A タブへの案内
+        self::assertStringContainsString('data-i18n="outOfScopeHeading"', $overview);
+        self::assertStringContainsString('data-i18n="outOfScopeInteractiveHint"', $overview);
+        self::assertStringContainsString('See the Interactive I/A tab for every namespace, component and source location.', $output);
+        self::assertStringContainsString('全名前空間・全コンポーネント・全コード位置は「対話型 I/A」タブで確認できます。', $output);
+
+        // 名前空間グループは10件まで＋残件数
+        self::assertSame(10, substr_count($overview, '<td>Vendor\\Ns'));
+        self::assertStringContainsString('+3 <span data-i18n="outOfScopeMoreNamespaces">', $overview);
+        // コンポーネントは10件まで＋残件数
+        self::assertSame(10, substr_count($overview, '<details class="scope-group">'));
+        self::assertStringContainsString('+2 <span data-i18n="outOfScopeMoreComponents">', $overview);
+        // 証拠は各グループ3件まで＋省略件数
+        self::assertStringContainsString('Http/Controller.php:3</li>', $overview);
+        self::assertStringNotContainsString('Http/Controller.php:4</li>', $overview);
+        self::assertStringContainsString('+2 <span data-i18n="outOfScopeMoreEvidence">', $overview);
+    }
+
+    public function testOverviewKeepsOutOfScopeSectionWhenNothingIsOutOfScope(): void
+    {
+        $overview = $this->overview((new PortalReporter())->render($this->simpleData()));
+
+        self::assertStringContainsString('data-i18n="outOfScopeHeading"', $overview);
+        self::assertStringContainsString('data-i18n="outOfScopeNone"', $overview);
+        self::assertStringContainsString('<dt data-i18n="outOfScopeDependencies">', $overview);
+        // 0件のときはグループ表もコンポーネント別も出さない
+        self::assertStringNotContainsString('data-i18n="outOfScopeNamespace"', $overview);
+        self::assertStringNotContainsString('data-i18n="outOfScopeComponentsHeading"', $overview);
+    }
+
+    public function testOutOfScopeSectionEscapesSourceLocationsAndDependencyKinds(): void
+    {
+        $data = $this->outOfScopeData(
+            groupCount: 1,
+            componentCount: 1,
+            evidenceCount: 1,
+            file: 'Http/<script>.php',
+        );
+
+        $overview = $this->overview((new PortalReporter())->render($data));
+
+        self::assertStringContainsString('<code>static_call</code> · Http/&lt;script&gt;.php:1', $overview);
+        self::assertStringNotContainsString('Http/<script>.php', $overview);
+    }
+
     public function testCyclesSectionRendersRepresentativePathAndEvidence(): void
     {
         $data = $this->simpleData();
@@ -346,6 +408,69 @@ final class PortalReporterTest extends TestCase
         self::assertNotFalse($endMarker);
 
         return substr($subject, 0, $start) . substr($subject, $endMarker + strlen($endNeedle));
+    }
+
+    /**
+     * Overview パネルの中身だけを取り出す（iframe に埋め込んだ HTML レポートや
+     * Sources タブの Markdown にも同じ文言が出るため、Overview 固有の検証を混ぜない）。
+     */
+    private function overview(string $output): string
+    {
+        $matched = preg_match(
+            '/<section class="panel" id="panel-overview"[^>]*>(.*?)<section class="panel" id="panel-interactive"/s',
+            $output,
+            $matches,
+        );
+        if ($matched !== 1) {
+            self::fail('Overview パネルが見つかりませんでした。');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * 上限（グループ10・コンポーネント10・証拠3）の検証用に、任意の件数の
+     * 解析対象外依存を持つ ReportData を組み立てる。
+     */
+    private function outOfScopeData(
+        int $groupCount,
+        int $componentCount,
+        int $evidenceCount,
+        string $file = 'Http/Controller.php',
+    ): ReportData {
+        $groups = [];
+        for ($index = 1; $index <= $groupCount; $index++) {
+            $evidence = [];
+            for ($line = 1; $line <= $evidenceCount; $line++) {
+                $evidence[] = new OutOfScopeDependencyEvidence(
+                    'App\\Http\\Controller',
+                    sprintf('Vendor\\Ns%d\\Facade', $index),
+                    DependencyKind::StaticCall,
+                    $file,
+                    $line,
+                );
+            }
+            $groups[] = new OutOfScopeDependencyGroup(
+                sprintf('Vendor\\Ns%d', $index),
+                [sprintf('Vendor\\Ns%d\\Facade', $index)],
+                ['App\\Http\\Controller'],
+                $evidence,
+            );
+        }
+
+        $components = [];
+        for ($index = 1; $index <= $componentCount; $index++) {
+            $components[] = new OutOfScopeDependencyComponent(sprintf('App\\C%d', $index), $groups);
+        }
+
+        $metrics = [$this->metrics('App\\Http', 0.9, 0.0, 0.1)];
+
+        return new ReportData(
+            $metrics,
+            MetricsSummary::from($metrics),
+            [],
+            outOfScopeDependencies: new OutOfScopeDependencyReport($groups, $components),
+        );
     }
 
     private function simpleData(): ReportData

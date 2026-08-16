@@ -8,9 +8,14 @@ use JsonException;
 use PHPUnit\Framework\TestCase;
 use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyKind;
 use Psap\Analyzer\TypeKind;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyEvidence;
+use Psap\Component\OutOfScopeDependencyGroup;
+use Psap\Component\OutOfScopeDependencyReport;
 use Psap\Diagnostic\Diagnostic;
 use Psap\Diagnostic\DiagnosticAction;
 use Psap\Diagnostic\DiagnosticCode;
@@ -50,12 +55,31 @@ use Psap\Report\ReportData;
  *         }>
  *     }>
  * }
+ * @phpstan-type HtmlOutOfScope array{
+ *     dependencyCount: int,
+ *     groupCount: int,
+ *     groups: list<array{namespace: string, dependencyCount: int, sourceCount: int, targets: list<string>}>,
+ *     components: list<array{
+ *         name: string,
+ *         dependencyCount: int,
+ *         groupCount: int,
+ *         groups: list<array{
+ *             namespace: string,
+ *             dependencyCount: int,
+ *             sourceCount: int,
+ *             targets: list<string>,
+ *             sources: list<string>,
+ *             evidence: list<array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}>
+ *         }>
+ *     }>
+ * }
  * @phpstan-type HtmlPayload array{
  *     summary: array{componentCount: int, meanDistance: float|null, cycleGroupCount: int},
  *     fileCoverage: array{discovered: int, selected: int, analyzed: int, excluded: int, skipped: int, analysisCoverage: float|int|null}|null,
  *     warnings: list<string>,
  *     diagnostics: list<array{code: string, severity: string, file: string|null, line: int|null, context: array<string, bool|float|int|string|null>, actions: list<string>}>,
  *     components: list<HtmlComponent>,
+ *     outOfScopeDependencies: HtmlOutOfScope,
  *     cycles: list<HtmlCycle>
  * }
  */
@@ -82,11 +106,18 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('id="coverage-panel"', $output);
         self::assertStringContainsString('id="warning-panel"', $output);
         self::assertStringContainsString('id="summary-cycles"', $output);
+        self::assertStringContainsString('id="out-of-scope-panel"', $output);
+        // セクション順序: コンポーネント一覧 → 解析対象外依存 → Cycles
+        // （チャートとコンポーネント表はどちらも絞り込みに連動するため隣接させ、
+        //   常に全体を出す解析対象外依存はその下に置く）
         $tablePosition = strpos($output, '<section class="table-panel"');
+        $outOfScopePosition = strpos($output, '<section id="out-of-scope-panel"');
         $cyclePosition = strpos($output, '<section id="cycle-panel"');
         self::assertNotFalse($tablePosition);
+        self::assertNotFalse($outOfScopePosition);
         self::assertNotFalse($cyclePosition);
-        self::assertGreaterThan($tablePosition, $cyclePosition);
+        self::assertGreaterThan($tablePosition, $outOfScopePosition);
+        self::assertGreaterThan($outOfScopePosition, $cyclePosition);
         self::assertStringNotContainsString('details.open = index === 0', $output);
         self::assertStringContainsString('<html lang="en">', $output);
         self::assertStringContainsString('<select id="language">', $output);
@@ -302,6 +333,97 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString("componentInCycle: 'Part of 1 cycle group'", $output);
     }
 
+    /**
+     * @throws JsonException
+     */
+    public function testEmbedsFullOutOfScopeDependenciesAndRendersTheirSection(): void
+    {
+        $metrics = [$this->metrics('App\\Http', 0.9, 0.0, 0.1)];
+        $data = new ReportData(
+            $metrics,
+            MetricsSummary::from($metrics),
+            [],
+            outOfScopeDependencies: $this->outOfScopeReport(),
+        );
+
+        $output = (new HtmlReporter())->render($data);
+        $payload = $this->payload($output);
+        $outOfScope = $payload['outOfScopeDependencies'];
+
+        // payload は JSON レポートと同形（値オブジェクトの jsonSerialize() を共有）
+        self::assertSame(2, $outOfScope['dependencyCount']);
+        self::assertSame(1, $outOfScope['groupCount']);
+        self::assertSame([
+            'namespace' => 'Vendor\\Support\\Facades',
+            'dependencyCount' => 2,
+            'sourceCount' => 1,
+            'targets' => ['Vendor\\Support\\Facades\\Cache', 'Vendor\\Support\\Facades\\DB'],
+        ], $outOfScope['groups'][0]);
+        // 全コンポーネント・全証拠を渡し、上位10件表示や展開はクライアント側で出し分ける
+        self::assertSame('App\\Http', $outOfScope['components'][0]['name']);
+        self::assertSame([[
+            'sourceFqcn' => 'App\\Http\\Controller',
+            'targetFqcn' => 'Vendor\\Support\\Facades\\DB',
+            'kind' => 'static_call',
+            'file' => 'Http/Controller.php',
+            'line' => 12,
+        ], [
+            'sourceFqcn' => 'App\\Http\\Controller',
+            'targetFqcn' => 'Vendor\\Support\\Facades\\Cache',
+            'kind' => 'class_constant',
+            'file' => 'Http/Controller.php',
+            'line' => 30,
+        ]], $outOfScope['components'][0]['groups'][0]['evidence']);
+
+        // セクションと描画関数
+        self::assertStringContainsString('id="out-of-scope-summary"', $output);
+        self::assertStringContainsString('id="out-of-scope-groups"', $output);
+        self::assertStringContainsString('id="out-of-scope-components"', $output);
+        self::assertStringContainsString('function renderOutOfScope()', $output);
+        self::assertStringContainsString('function renderOutOfScopeGroups(groups)', $output);
+        self::assertStringContainsString('function renderOutOfScopeComponents(components)', $output);
+        // 初期表示は上位10件、残りは「すべて表示」で展開する
+        self::assertStringContainsString('const OUT_OF_SCOPE_PREVIEW_LIMIT = 10', $output);
+        self::assertStringContainsString('outOfScopeExpanded ? groups : groups.slice(0, OUT_OF_SCOPE_PREVIEW_LIMIT)', $output);
+        self::assertStringContainsString("toggle.setAttribute('aria-expanded'", $output);
+        // 言語切替でも再描画される
+        self::assertMatchesRegularExpression(
+            '/function applyLanguage\(\).*?renderOutOfScope\(\);.*?\n      \}/s',
+            $output,
+        );
+        // en / ja 双方の文言
+        self::assertStringContainsString("outOfScopeHeading: 'Dependencies outside analysis scope'", $output);
+        self::assertStringContainsString("outOfScopeHeading: '解析対象外依存'", $output);
+        self::assertStringContainsString("outOfScopeEvidence: '{source} → {target} · {kind} at {file}:{line}'", $output);
+        self::assertStringContainsString('これらの参照はCa、Ce、I、A、Dに算入されません。PHP組み込みの型は集計から除外しています。', $output);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testKeepsOutOfScopeSectionVisibleWhenNothingIsOutOfScope(): void
+    {
+        $metrics = [$this->metrics('App\\Domain', 0.2, 0.75, 0.05)];
+        $data = new ReportData($metrics, MetricsSummary::from($metrics), []);
+
+        $output = (new HtmlReporter())->render($data);
+        $payload = $this->payload($output);
+
+        self::assertSame([
+            'dependencyCount' => 0,
+            'groupCount' => 0,
+            'groups' => [],
+            'components' => [],
+        ], $payload['outOfScopeDependencies']);
+        // 0件でもセクションは残す（cycle-panel のように hidden にしない）
+        self::assertStringNotContainsString('outOfScopePanel.hidden', $output);
+        self::assertStringContainsString('<section id="out-of-scope-panel" class="out-of-scope-panel"', $output);
+        self::assertStringNotContainsString('<section id="out-of-scope-panel" class="out-of-scope-panel" hidden', $output);
+        self::assertStringContainsString("outOfScopePanel.classList.toggle('is-empty', empty)", $output);
+        self::assertStringContainsString("outOfScopeNone: 'None (0)'", $output);
+        self::assertStringContainsString("outOfScopeNone: '該当なし (0)'", $output);
+    }
+
     public function testSupportsEmbeddedModeInsideAnotherPage(): void
     {
         $metrics = [$this->metrics('App\\Domain', 0.2, 0.75, 0.05)];
@@ -416,6 +538,37 @@ final class HtmlReporterTest extends TestCase
         $payload = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
 
         return $payload;
+    }
+
+    /** 1コンポーネントが facade 2クラスを参照している最小の解析対象外依存。 */
+    private function outOfScopeReport(): OutOfScopeDependencyReport
+    {
+        $group = new OutOfScopeDependencyGroup(
+            'Vendor\\Support\\Facades',
+            ['Vendor\\Support\\Facades\\Cache', 'Vendor\\Support\\Facades\\DB'],
+            ['App\\Http\\Controller'],
+            [
+                new OutOfScopeDependencyEvidence(
+                    'App\\Http\\Controller',
+                    'Vendor\\Support\\Facades\\DB',
+                    DependencyKind::StaticCall,
+                    'Http/Controller.php',
+                    12,
+                ),
+                new OutOfScopeDependencyEvidence(
+                    'App\\Http\\Controller',
+                    'Vendor\\Support\\Facades\\Cache',
+                    DependencyKind::ClassConstant,
+                    'Http/Controller.php',
+                    30,
+                ),
+            ],
+        );
+
+        return new OutOfScopeDependencyReport(
+            groups: [$group],
+            components: [new OutOfScopeDependencyComponent('App\\Http', [$group])],
+        );
     }
 
     /**

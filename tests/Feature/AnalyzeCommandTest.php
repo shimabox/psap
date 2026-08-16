@@ -825,6 +825,106 @@ final class AnalyzeCommandTest extends TestCase
         self::assertSame($firstText, $secondText);
     }
 
+    public function testHtmlEmbedsTheSameOutOfScopeDependenciesAsTheJsonReport(): void
+    {
+        $expected = $this->decodeJson($this->render(['--format' => 'json']))['outOfScopeDependencies'];
+
+        $html = $this->render(['--format' => 'html']);
+        $payload = $this->htmlPayload($html);
+
+        // html の埋め込み payload は json 出力と同形（同じ値オブジェクトのシリアライズ）
+        self::assertSame($expected, $payload['outOfScopeDependencies']);
+        // 全量を渡す: 全コンポーネント・全証拠が含まれる（上位10件の出し分けは JS 側）
+        self::assertSame(
+            ['Fixture\\OutOfScope\\Http', 'Fixture\\OutOfScope\\Domain'],
+            array_column($payload['outOfScopeDependencies']['components'], 'name'),
+        );
+        // 依存種別とコード位置が payload に入り、payload は <script> を割れない形で埋め込まれる
+        self::assertStringContainsString('static_call', $html);
+        self::assertStringContainsString('Http\\/ReportController.php', $html);
+        self::assertSame(2, substr_count($html, '<script'));
+
+        // セクションのDOM順序: コンポーネント一覧 → 解析対象外依存 → Cycles
+        $tablePosition = strpos($html, '<section class="table-panel"');
+        $outOfScopePosition = strpos($html, '<section id="out-of-scope-panel"');
+        $cyclePosition = strpos($html, '<section id="cycle-panel"');
+        self::assertNotFalse($tablePosition);
+        self::assertNotFalse($outOfScopePosition);
+        self::assertNotFalse($cyclePosition);
+        self::assertGreaterThan($tablePosition, $outOfScopePosition);
+        self::assertGreaterThan($outOfScopePosition, $cyclePosition);
+    }
+
+    public function testPortalRendersOutOfScopeSectionWithEvidenceAndInteractiveTabHint(): void
+    {
+        $portal = $this->render(['--format' => 'portal']);
+
+        // Overview の統計カードとセクション
+        self::assertStringContainsString('<dt data-i18n="outOfScopeDependencies">', $portal);
+        self::assertStringContainsString('data-i18n="outOfScopeHeading"', $portal);
+        // 依存種別とコード位置は HTML エスケープを通して出力する
+        self::assertStringContainsString(
+            '<code>Fixture\\OutOfScope\\Domain\\Report &rarr; Fixture\\Vendor\\Support\\Facades\\DB</code>'
+            . ' · <code>static_call</code> · Domain/Report.php:21',
+            $portal,
+        );
+        // 全量は Interactive I/A タブへ誘導する
+        self::assertStringContainsString('data-i18n="outOfScopeInteractiveHint"', $portal);
+
+        // iframe に埋め込んだ I/A レポートは、ポータルの言語切替に追従して
+        // 動的セクション（解析対象外依存）を再描画する
+        $matched = preg_match('/srcdoc="(.*?)"/s', $portal, $matches);
+        self::assertSame(1, $matched, 'iframe srcdoc attribute was not found.');
+        $embedded = html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+        self::assertStringContainsString("data.type === 'psap:set-locale'", $embedded);
+        self::assertMatchesRegularExpression(
+            '/function applyLanguage\(\).*?renderOutOfScope\(\);.*?\n      \}/s',
+            $embedded,
+        );
+        self::assertStringContainsString(
+            "frame.contentWindow.postMessage({ type: 'psap:set-locale', locale }, '*')",
+            $portal,
+        );
+    }
+
+    public function testHtmlAndPortalKeepTheOutOfScopeSectionWhenNothingIsOutOfScope(): void
+    {
+        // SimpleProject の解析対象外依存は0件（PHP組み込み型しか参照していない）
+        $html = $this->commandTester();
+        $html->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'html']);
+        $htmlDisplay = $html->getDisplay();
+
+        self::assertStringContainsString('<section id="out-of-scope-panel" class="out-of-scope-panel"', $htmlDisplay);
+        self::assertStringNotContainsString('<section id="out-of-scope-panel" class="out-of-scope-panel" hidden', $htmlDisplay);
+        self::assertStringNotContainsString('outOfScopePanel.hidden', $htmlDisplay);
+        self::assertSame(
+            ['dependencyCount' => 0, 'groupCount' => 0, 'groups' => [], 'components' => []],
+            $this->htmlPayload($htmlDisplay)['outOfScopeDependencies'],
+        );
+
+        $portal = $this->commandTester();
+        $portal->execute(['paths' => [self::SIMPLE_PROJECT], '--format' => 'portal']);
+        $portalDisplay = $portal->getDisplay();
+
+        self::assertStringContainsString('data-i18n="outOfScopeHeading"', $portalDisplay);
+        self::assertStringContainsString('data-i18n="outOfScopeNone"', $portalDisplay);
+    }
+
+    public function testHtmlAndPortalTranslateEveryMessageKeyInBothLanguages(): void
+    {
+        // srcdoc に埋め込んだ I/A レポートの辞書とポータル自身の辞書を取り違えないよう、
+        // ポータル側は srcdoc を取り除いてから辞書を取り出す
+        $portal = $this->render(['--format' => 'portal']);
+
+        foreach ([$this->render(['--format' => 'html']), $this->removeBetween($portal, 'srcdoc="', '"')] as $document) {
+            [$en, $ja] = $this->translationKeys($document);
+
+            self::assertNotSame([], $en);
+            self::assertSame($en, $ja);
+            self::assertContains('outOfScopeHeading', $en);
+        }
+    }
+
     public function testMetricsAndCycleDetectionAreUnaffectedByOutOfScopeCollection(): void
     {
         $simple = $this->commandTester();
@@ -927,6 +1027,58 @@ final class AnalyzeCommandTest extends TestCase
         self::assertNotFalse($endMarker);
 
         return substr($subject, 0, $start) . substr($subject, $endMarker + strlen($endNeedle));
+    }
+
+    /**
+     * html レポートに埋め込まれた JSON payload を取り出す。
+     *
+     * @return array{outOfScopeDependencies: JsonReport['outOfScopeDependencies']}
+     */
+    private function htmlPayload(string $output): array
+    {
+        $matched = preg_match(
+            '/<script id="psap-data" type="application\/json">(.*?)<\/script>/s',
+            $output,
+            $matches,
+        );
+        if ($matched !== 1) {
+            self::fail('html レポートの埋め込み JSON payload が見つかりませんでした。');
+        }
+
+        /** @var array{outOfScopeDependencies: JsonReport['outOfScopeDependencies']} $payload */
+        $payload = json_decode($matches[1], true, flags: JSON_THROW_ON_ERROR);
+
+        return $payload;
+    }
+
+    /**
+     * クライアントJSの i18n 辞書から en / ja のキー一覧を取り出す。
+     *
+     * 辞書は `const messages = { en: { ... }, ja: { ... } };` の形で、
+     * 言語は8スペース、キーは10スペースのインデントで並ぶ。
+     *
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private function translationKeys(string $document): array
+    {
+        $matched = preg_match('/\n      const messages = \{\n(.*?)\n      \};\n/s', $document, $matches);
+        if ($matched !== 1) {
+            self::fail('i18n 辞書が見つかりませんでした。');
+        }
+
+        $blocks = preg_split('/\n        ja: \{\n/', $matches[1]);
+        self::assertIsArray($blocks);
+        self::assertCount(2, $blocks, 'en / ja の辞書に分割できませんでした。');
+
+        return [$this->messageKeys($blocks[0]), $this->messageKeys($blocks[1])];
+    }
+
+    /** @return list<string> */
+    private function messageKeys(string $block): array
+    {
+        preg_match_all('/^ {10}(\w+):/m', $block, $matches);
+
+        return $matches[1];
     }
 
     /** @return JsonReport */

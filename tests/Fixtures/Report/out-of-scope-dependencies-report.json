@@ -1,0 +1,153 @@
+{
+    "summary": {
+        "componentCount": 0,
+        "namespaceDepth": null,
+        "metricsEvaluable": false,
+        "meanDistance": null,
+        "varianceDistance": null
+    },
+    "components": [],
+    "dependencies": [],
+    "outOfScopeDependencies": {
+        "dependencyCount": 4,
+        "groupCount": 3,
+        "groups": [
+            {
+                "namespace": "Fixture\\Vendor\\Support\\Facades",
+                "dependencyCount": 2,
+                "sourceCount": 2,
+                "targets": [
+                    "Fixture\\Vendor\\Support\\Facades\\Cache",
+                    "Fixture\\Vendor\\Support\\Facades\\DB"
+                ]
+            },
+            {
+                "namespace": "(global)",
+                "dependencyCount": 1,
+                "sourceCount": 1,
+                "targets": [
+                    "GlobalFacade"
+                ]
+            },
+            {
+                "namespace": "Fixture\\Vendor\\Log",
+                "dependencyCount": 1,
+                "sourceCount": 1,
+                "targets": [
+                    "Fixture\\Vendor\\Log\\Logger"
+                ]
+            }
+        ],
+        "components": [
+            {
+                "name": "Fixture\\OutOfScope\\Http",
+                "dependencyCount": 4,
+                "groupCount": 3,
+                "groups": [
+                    {
+                        "namespace": "Fixture\\Vendor\\Support\\Facades",
+                        "dependencyCount": 2,
+                        "sourceCount": 1,
+                        "targets": [
+                            "Fixture\\Vendor\\Support\\Facades\\Cache",
+                            "Fixture\\Vendor\\Support\\Facades\\DB"
+                        ],
+                        "sources": [
+                            "Fixture\\OutOfScope\\Http\\ReportController"
+                        ],
+                        "evidence": [
+                            {
+                                "sourceFqcn": "Fixture\\OutOfScope\\Http\\ReportController",
+                                "targetFqcn": "Fixture\\Vendor\\Support\\Facades\\Cache",
+                                "kind": "static_call",
+                                "file": "Http/ReportController.php",
+                                "line": 24
+                            },
+                            {
+                                "sourceFqcn": "Fixture\\OutOfScope\\Http\\ReportController",
+                                "targetFqcn": "Fixture\\Vendor\\Support\\Facades\\DB",
+                                "kind": "static_call",
+                                "file": "Http/ReportController.php",
+                                "line": 18
+                            }
+                        ]
+                    },
+                    {
+                        "namespace": "(global)",
+                        "dependencyCount": 1,
+                        "sourceCount": 1,
+                        "targets": [
+                            "GlobalFacade"
+                        ],
+                        "sources": [
+                            "Fixture\\OutOfScope\\Http\\ReportController"
+                        ],
+                        "evidence": [
+                            {
+                                "sourceFqcn": "Fixture\\OutOfScope\\Http\\ReportController",
+                                "targetFqcn": "GlobalFacade",
+                                "kind": "static_call",
+                                "file": "Http/ReportController.php",
+                                "line": 30
+                            }
+                        ]
+                    },
+                    {
+                        "namespace": "Fixture\\Vendor\\Log",
+                        "dependencyCount": 1,
+                        "sourceCount": 1,
+                        "targets": [
+                            "Fixture\\Vendor\\Log\\Logger"
+                        ],
+                        "sources": [
+                            "Fixture\\OutOfScope\\Http\\ReportController"
+                        ],
+                        "evidence": [
+                            {
+                                "sourceFqcn": "Fixture\\OutOfScope\\Http\\ReportController",
+                                "targetFqcn": "Fixture\\Vendor\\Log\\Logger",
+                                "kind": "parameter_type",
+                                "file": "Http/ReportController.php",
+                                "line": 12
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Fixture\\OutOfScope\\Domain",
+                "dependencyCount": 1,
+                "groupCount": 1,
+                "groups": [
+                    {
+                        "namespace": "Fixture\\Vendor\\Support\\Facades",
+                        "dependencyCount": 1,
+                        "sourceCount": 1,
+                        "targets": [
+                            "Fixture\\Vendor\\Support\\Facades\\DB"
+                        ],
+                        "sources": [
+                            "Fixture\\OutOfScope\\Domain\\Report"
+                        ],
+                        "evidence": [
+                            {
+                                "sourceFqcn": "Fixture\\OutOfScope\\Domain\\Report",
+                                "targetFqcn": "Fixture\\Vendor\\Support\\Facades\\DB",
+                                "kind": "static_call",
+                                "file": "Domain/Report.php",
+                                "line": 21
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "cycles": [],
+    "cyclePaths": [],
+    "cycleGroups": [],
+    "cycleBaselineComparison": null,
+    "fileCoverage": null,
+    "diagnostics": [],
+    "warnings": []
+}
