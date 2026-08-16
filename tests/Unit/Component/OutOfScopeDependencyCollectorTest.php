@@ -12,6 +12,7 @@ use Psap\Analyzer\TypeKind;
 use Psap\Component\Component;
 use Psap\Component\OutOfScopeDependencyCollector;
 use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyEvidence;
 use Psap\Component\OutOfScopeDependencyGroup;
 use Psap\Report\ReportData;
 
@@ -232,6 +233,83 @@ final class OutOfScopeDependencyCollectorTest extends TestCase
         self::assertSame(1, $report->dependencyCount());
         self::assertSame(1, $report->groups[0]->sourceCount());
         self::assertCount(1, $report->groups[0]->evidence);
+    }
+
+    public function testEvidenceFqcnsUseTheSameSpellingAsTargetsAndSources(): void
+    {
+        // 表記ゆれがあっても、証拠の FQCN は targets / sources と完全一致する表記になる。
+        // ここがずれると完全一致で突き合わせる機械処理から証拠が孤立する
+        $components = [
+            $this->component('App\\Http', [
+                $this->classInfo('App\\Http\\Controller', ['Vendor\\Pkg\\Thing', 'vendor\\pkg\\thing'], [
+                    new DependencyEvidence('Vendor\\Pkg\\Thing', DependencyKind::StaticCall, 'Http/Controller.php', 12),
+                    new DependencyEvidence('vendor\\pkg\\thing', DependencyKind::New, 'Http/Controller.php', 30),
+                ]),
+                $this->classInfo('app\\http\\controller2', ['VENDOR\\PKG\\THING'], [
+                    new DependencyEvidence('VENDOR\\PKG\\THING', DependencyKind::ClassConstant, 'Http/Controller2.php', 8),
+                ]),
+            ]),
+        ];
+
+        $report = (new OutOfScopeDependencyCollector())->collect($components);
+        $group = $report->groups[0];
+
+        self::assertSame(['Vendor\\Pkg\\Thing'], $group->targetFqcns);
+        self::assertSame(['App\\Http\\Controller', 'app\\http\\controller2'], $group->sourceFqcns);
+
+        $evidenceTargets = array_values(array_unique(array_map(
+            static fn (OutOfScopeDependencyEvidence $evidence): string => $evidence->targetFqcn,
+            $group->evidence,
+        )));
+        $evidenceSources = array_values(array_unique(array_map(
+            static fn (OutOfScopeDependencyEvidence $evidence): string => $evidence->sourceFqcn,
+            $group->evidence,
+        )));
+        sort($evidenceTargets);
+        sort($evidenceSources);
+
+        self::assertSame(['Vendor\\Pkg\\Thing'], $evidenceTargets);
+        self::assertSame(['App\\Http\\Controller', 'app\\http\\controller2'], $evidenceSources);
+        self::assertSame([], array_diff($evidenceTargets, $group->targetFqcns));
+        self::assertSame([], array_diff($evidenceSources, $group->sourceFqcns));
+    }
+
+    public function testEvidenceFqcnsAreCanonicalizedInComponentGroupsToo(): void
+    {
+        $components = [
+            $this->component('App\\Http', [
+                $this->classInfo('App\\Http\\Controller', ['Vendor\\Pkg\\Thing'], [
+                    new DependencyEvidence('Vendor\\Pkg\\Thing', DependencyKind::StaticCall, 'Http/Controller.php', 12),
+                ]),
+            ]),
+            $this->component('App\\Domain', [
+                $this->classInfo('App\\Domain\\Order', ['vendor\\pkg\\thing'], [
+                    new DependencyEvidence('vendor\\pkg\\thing', DependencyKind::New, 'Domain/Order.php', 20),
+                ]),
+            ]),
+        ];
+
+        $report = (new OutOfScopeDependencyCollector())->collect($components);
+
+        // 全体グループでは App\Http が先に現れるので Vendor\Pkg\Thing が canonical
+        self::assertSame(['Vendor\\Pkg\\Thing'], $report->groups[0]->targetFqcns);
+        self::assertSame(
+            ['Vendor\\Pkg\\Thing', 'Vendor\\Pkg\\Thing'],
+            array_map(
+                static fn (OutOfScopeDependencyEvidence $evidence): string => $evidence->targetFqcn,
+                $report->groups[0]->evidence,
+            ),
+        );
+
+        // コンポーネント別グループはそれぞれの先勝ち表記に揃う（targets と必ず一致する）
+        foreach ($report->components as $component) {
+            foreach ($component->groups as $group) {
+                foreach ($group->evidence as $evidence) {
+                    self::assertContains($evidence->targetFqcn, $group->targetFqcns);
+                    self::assertContains($evidence->sourceFqcn, $group->sourceFqcns);
+                }
+            }
+        }
     }
 
     public function testSortsGroupsByCountDescendingThenNamespaceAscending(): void

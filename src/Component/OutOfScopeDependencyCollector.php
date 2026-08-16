@@ -175,7 +175,7 @@ final class OutOfScopeDependencyCollector
             $sources = array_values($group['sources']);
             sort($sources);
 
-            $evidence = array_values($group['evidence']);
+            $evidence = $this->canonicalizeEvidence($group['evidence'], $group['targets'], $group['sources']);
             usort(
                 $evidence,
                 static fn (OutOfScopeDependencyEvidence $a, OutOfScopeDependencyEvidence $b): int => [
@@ -204,6 +204,44 @@ final class OutOfScopeDependencyCollector
         );
 
         return $finalized;
+    }
+
+    /**
+     * 証拠の FQCN を targets / sources と同じ先勝ち表記へ揃える。
+     *
+     * 証拠は DependencyEvidence の表記をそのまま持っているため、同じクラスを
+     * 異なる大文字小文字で参照していると targets に存在しない文字列が証拠側に残り、
+     * 完全一致で突き合わせる機械処理から証拠が孤立してしまう。
+     * 表記を揃えた結果として重複した証拠は1件に畳む。
+     *
+     * @param array<string, OutOfScopeDependencyEvidence> $evidence
+     * @param array<string, string> $targets 小文字化した FQCN → 先勝ちの表記
+     * @param array<string, string> $sources 小文字化した FQCN → 先勝ちの表記
+     * @return list<OutOfScopeDependencyEvidence>
+     */
+    private function canonicalizeEvidence(array $evidence, array $targets, array $sources): array
+    {
+        $canonicalized = [];
+        foreach ($evidence as $item) {
+            $targetFqcn = $targets[strtolower($item->targetFqcn)] ?? $item->targetFqcn;
+            $sourceFqcn = $sources[strtolower($item->sourceFqcn)] ?? $item->sourceFqcn;
+            $key = implode("\0", [
+                strtolower($sourceFqcn),
+                strtolower($targetFqcn),
+                $item->kind->value,
+                $item->file,
+                (string) $item->line,
+            ]);
+            $canonicalized[$key] = new OutOfScopeDependencyEvidence(
+                sourceFqcn: $sourceFqcn,
+                targetFqcn: $targetFqcn,
+                kind: $item->kind,
+                file: $item->file,
+                line: $item->line,
+            );
+        }
+
+        return array_values($canonicalized);
     }
 
     /**
