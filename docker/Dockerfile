@@ -6,7 +6,10 @@
 #   dist-plantuml … PlantUML レンダラー同梱の実行イメージ（analyze して即 PNG まで出す用）
 
 # ---- dev: 開発用ステージ -----------------------------------------------
-FROM php:8.5-cli AS dev
+# PHP_VERSION は compose.yaml から上書きされる（通常開発は 8.5、cs サービスは
+# 最低対応の 8.3 でビルドして PHP CS Fixer を下限バージョンで動かす）
+ARG PHP_VERSION=8.5
+FROM php:${PHP_VERSION}-cli AS dev
 
 # composer がパッケージ展開に使う unzip、および zip 拡張を導入
 RUN apt-get update \

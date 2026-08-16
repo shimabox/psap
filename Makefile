@@ -16,11 +16,11 @@ test: ## phpunit を実行する
 stan: ## phpstan (level max) を実行する
 	docker compose run --rm app composer stan
 
-cs: ## コーディングスタイルをチェックする（dry-run）
-	docker compose run --rm app composer cs
+cs: ## コーディングスタイルをチェックする（dry-run。最低対応PHPの cs サービスで実行）
+	docker compose run --rm cs composer cs
 
-cs-fix: ## コーディングスタイルを自動整形する
-	docker compose run --rm app composer cs:fix
+cs-fix: ## コーディングスタイルを自動整形する（最低対応PHPの cs サービスで実行）
+	docker compose run --rm cs composer cs:fix
 
 phar: ## psap.phar を生成する（docker/Dockerfile の phar ステージ、clue/phar-composer を利用）
 	docker build -t psap-phar-builder --target phar -f docker/Dockerfile .

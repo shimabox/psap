@@ -1,5 +1,7 @@
 # CI ワークフロー。
-#   checks         … PHP 8.3 / 8.4 / 8.5 のマトリクスで composer validate / test / stan / cs を実行
+#   checks         … PHP 8.3 / 8.4 / 8.5 のマトリクスで composer validate / test / stan を実行。
+#                    cs は最低対応の 8.3 の脚のみ（PHP CS Fixer は下限バージョンで動かす方針。
+#                    上位バージョンだと警告が出るうえ、スタイル結果はバージョンに依らない）
 #   console-lowest … symfony/console を 6.4 系（下限）へ落として test + CLI スモークを実行。
 #                    composer.json の "^6.4 || ^7" が実際に動くことを保証するゲート
 #   composer-install-smoke
@@ -56,7 +58,10 @@ jobs:
       - name: 静的解析を実行（phpstan level max）
         run: composer stan
 
+      # PHP CS Fixer は最低対応バージョンで動かす（上位バージョンでは
+      # composer.json の下限との差の警告が出る。スタイル結果は同じなので1脚で十分）
       - name: コーディングスタイルをチェック（php-cs-fixer dry-run）
+        if: matrix.php-version == '8.3'
         run: composer cs
 
   console-lowest:
