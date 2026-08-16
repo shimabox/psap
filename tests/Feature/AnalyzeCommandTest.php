@@ -844,15 +844,15 @@ final class AnalyzeCommandTest extends TestCase
         self::assertStringContainsString('Http\\/ReportController.php', $html);
         self::assertSame(2, substr_count($html, '<script'));
 
-        // セクションのDOM順序: 解析対象外依存 → コンポーネント一覧 → Cycles
-        $outOfScopePosition = strpos($html, '<section id="out-of-scope-panel"');
+        // セクションのDOM順序: コンポーネント一覧 → 解析対象外依存 → Cycles
         $tablePosition = strpos($html, '<section class="table-panel"');
+        $outOfScopePosition = strpos($html, '<section id="out-of-scope-panel"');
         $cyclePosition = strpos($html, '<section id="cycle-panel"');
-        self::assertNotFalse($outOfScopePosition);
         self::assertNotFalse($tablePosition);
+        self::assertNotFalse($outOfScopePosition);
         self::assertNotFalse($cyclePosition);
-        self::assertGreaterThan($outOfScopePosition, $tablePosition);
-        self::assertGreaterThan($tablePosition, $cyclePosition);
+        self::assertGreaterThan($tablePosition, $outOfScopePosition);
+        self::assertGreaterThan($outOfScopePosition, $cyclePosition);
     }
 
     public function testPortalRendersOutOfScopeSectionWithEvidenceAndInteractiveTabHint(): void

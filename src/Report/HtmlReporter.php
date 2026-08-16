@@ -919,6 +919,17 @@ final class HtmlReporter implements ReporterInterface
       </aside>
     </section>
 
+    <section class="table-panel" aria-label="Component data" data-i18n-aria-label="componentData">
+      <table>
+        <caption data-i18n="matchingComponents">Components matching the current filters</caption>
+        <thead><tr><th scope="col" data-i18n="component">Component</th><th scope="col" data-i18n="types">Types</th><th scope="col">Ca</th><th scope="col">Ce</th><th scope="col">I</th><th scope="col">A</th><th scope="col">D</th><th scope="col" data-i18n="zone">Zone</th></tr></thead>
+        <tbody id="component-rows"></tbody>
+      </table>
+    </section>
+
+    <!-- Placed after the component table: the chart and that table both react to
+         the toolbar filters and belong together, while this panel always shows
+         the whole project. -->
     <section id="out-of-scope-panel" class="out-of-scope-panel" aria-labelledby="out-of-scope-heading">
       <header class="out-of-scope-header">
         <p class="eyebrow" data-i18n="outOfScopeEyebrow">Analysis scope</p>
@@ -929,14 +940,6 @@ final class HtmlReporter implements ReporterInterface
       <p id="out-of-scope-summary" class="out-of-scope-total">—</p>
       <div id="out-of-scope-groups" class="out-of-scope-groups"></div>
       <div id="out-of-scope-components"></div>
-    </section>
-
-    <section class="table-panel" aria-label="Component data" data-i18n-aria-label="componentData">
-      <table>
-        <caption data-i18n="matchingComponents">Components matching the current filters</caption>
-        <thead><tr><th scope="col" data-i18n="component">Component</th><th scope="col" data-i18n="types">Types</th><th scope="col">Ca</th><th scope="col">Ce</th><th scope="col">I</th><th scope="col">A</th><th scope="col">D</th><th scope="col" data-i18n="zone">Zone</th></tr></thead>
-        <tbody id="component-rows"></tbody>
-      </table>
     </section>
 
     <section id="cycle-panel" class="cycle-panel" aria-labelledby="cycle-heading" hidden>

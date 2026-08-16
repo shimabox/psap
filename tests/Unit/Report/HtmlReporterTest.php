@@ -107,15 +107,17 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('id="warning-panel"', $output);
         self::assertStringContainsString('id="summary-cycles"', $output);
         self::assertStringContainsString('id="out-of-scope-panel"', $output);
-        // セクション順序: 解析対象外依存 → コンポーネント一覧 → Cycles
-        $outOfScopePosition = strpos($output, '<section id="out-of-scope-panel"');
+        // セクション順序: コンポーネント一覧 → 解析対象外依存 → Cycles
+        // （チャートとコンポーネント表はどちらも絞り込みに連動するため隣接させ、
+        //   常に全体を出す解析対象外依存はその下に置く）
         $tablePosition = strpos($output, '<section class="table-panel"');
+        $outOfScopePosition = strpos($output, '<section id="out-of-scope-panel"');
         $cyclePosition = strpos($output, '<section id="cycle-panel"');
-        self::assertNotFalse($outOfScopePosition);
         self::assertNotFalse($tablePosition);
+        self::assertNotFalse($outOfScopePosition);
         self::assertNotFalse($cyclePosition);
-        self::assertGreaterThan($outOfScopePosition, $tablePosition);
-        self::assertGreaterThan($tablePosition, $cyclePosition);
+        self::assertGreaterThan($tablePosition, $outOfScopePosition);
+        self::assertGreaterThan($outOfScopePosition, $cyclePosition);
         self::assertStringNotContainsString('details.open = index === 0', $output);
         self::assertStringContainsString('<html lang="en">', $output);
         self::assertStringContainsString('<select id="language">', $output);
