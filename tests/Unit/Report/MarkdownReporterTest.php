@@ -7,10 +7,15 @@ namespace Psap\Tests\Unit\Report;
 use PHPUnit\Framework\TestCase;
 use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyKind;
 use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyEvidence;
+use Psap\Component\OutOfScopeDependencyGroup;
+use Psap\Component\OutOfScopeDependencyReport;
 use Psap\Diagnostic\Diagnostic;
 use Psap\Diagnostic\DiagnosticAction;
 use Psap\Diagnostic\DiagnosticCode;
@@ -174,6 +179,105 @@ final class MarkdownReporterTest extends TestCase
 
         self::assertStringNotContainsString('| Analysis coverage |', $output);
         self::assertStringNotContainsString('| Discovered PHP files |', $output);
+    }
+
+    public function testRendersOutOfScopeDependenciesWithGroupTablesAndEvidence(): void
+    {
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            outOfScopeDependencies: $this->outOfScopeReport(),
+        );
+
+        $output = (new MarkdownReporter())->render($data);
+
+        self::assertStringContainsString('## Dependencies outside analysis scope', $output);
+        self::assertStringContainsString('Distinct classes outside the analysis scope 3 in 2 namespaces.', $output);
+        self::assertStringContainsString('| Namespace | Classes | Referencing classes |', $output);
+        self::assertStringContainsString('| `Vendor\\Support\\Facades` | 2 | 2 |', $output);
+        self::assertStringContainsString('| `(global)` | 1 | 1 |', $output);
+        self::assertStringContainsString('### `App\\Http`', $output);
+        self::assertStringContainsString(
+            '- `App\\Http\\Controller` to `Vendor\\Support\\Facades\\DB` using `static_call` at `Http/Controller.php:12`',
+            $output,
+        );
+    }
+
+    public function testLimitsOutOfScopeEvidenceToThreePerGroup(): void
+    {
+        $evidence = [];
+        for ($line = 1; $line <= 5; $line++) {
+            $evidence[] = new OutOfScopeDependencyEvidence(
+                'App\\Http\\Controller',
+                'Vendor\\Support\\Facades\\DB',
+                DependencyKind::StaticCall,
+                'Http/Controller.php',
+                $line,
+            );
+        }
+        $group = new OutOfScopeDependencyGroup(
+            'Vendor\\Support\\Facades',
+            ['Vendor\\Support\\Facades\\DB'],
+            ['App\\Http\\Controller'],
+            $evidence,
+        );
+        $data = new ReportData(
+            [],
+            MetricsSummary::from([]),
+            [],
+            outOfScopeDependencies: new OutOfScopeDependencyReport(
+                [$group],
+                [new OutOfScopeDependencyComponent('App\\Http', [$group])],
+            ),
+        );
+
+        $output = (new MarkdownReporter())->render($data);
+
+        self::assertStringContainsString('at `Http/Controller.php:3`', $output);
+        self::assertStringNotContainsString('at `Http/Controller.php:4`', $output);
+        self::assertStringContainsString('- 2 additional source locations omitted', $output);
+    }
+
+    public function testRendersOutOfScopeSectionWithZeroWhenNothingIsOutOfScope(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), []);
+
+        $output = (new MarkdownReporter())->render($data);
+
+        self::assertStringContainsString("## Dependencies outside analysis scope\n\n0 (None)", $output);
+    }
+
+    private function outOfScopeReport(): OutOfScopeDependencyReport
+    {
+        return new OutOfScopeDependencyReport(
+            groups: [
+                new OutOfScopeDependencyGroup(
+                    'Vendor\\Support\\Facades',
+                    ['Vendor\\Support\\Facades\\Cache', 'Vendor\\Support\\Facades\\DB'],
+                    ['App\\Domain\\Order', 'App\\Http\\Controller'],
+                    [],
+                ),
+                new OutOfScopeDependencyGroup('(global)', ['GlobalFacade'], ['App\\Http\\Controller'], []),
+            ],
+            components: [
+                new OutOfScopeDependencyComponent('App\\Http', [
+                    new OutOfScopeDependencyGroup(
+                        'Vendor\\Support\\Facades',
+                        ['Vendor\\Support\\Facades\\DB'],
+                        ['App\\Http\\Controller'],
+                        [new OutOfScopeDependencyEvidence(
+                            'App\\Http\\Controller',
+                            'Vendor\\Support\\Facades\\DB',
+                            DependencyKind::StaticCall,
+                            'Http/Controller.php',
+                            12,
+                        )],
+                    ),
+                    new OutOfScopeDependencyGroup('(global)', ['GlobalFacade'], ['App\\Http\\Controller'], []),
+                ]),
+            ],
+        );
     }
 
     private function metrics(

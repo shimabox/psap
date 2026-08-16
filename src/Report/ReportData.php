@@ -9,6 +9,7 @@ use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\CyclePathFinder;
 use Psap\Component\DependencyGraph;
+use Psap\Component\OutOfScopeDependencyReport;
 use Psap\Diagnostic\Diagnostic;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\MetricsSummary;
@@ -25,6 +26,9 @@ final readonly class ReportData
 
     /** @var list<list<string>> 始点を末尾にも含む代表循環経路 */
     public array $cyclePaths;
+
+    /** 解析対象外依存の集計（未指定なら空の集計。メトリクスには影響しない） */
+    public OutOfScopeDependencyReport $outOfScopeDependencies;
 
     /**
      * @param list<ComponentMetrics> $componentMetrics
@@ -47,12 +51,14 @@ final readonly class ReportData
         public array $excludePatterns = [],
         public ?AnalysisCoverage $analysisCoverage = null,
         public array $diagnostics = [],
+        ?OutOfScopeDependencyReport $outOfScopeDependencies = null,
     ) {
         $components = array_map(
             static fn (ComponentMetrics $metrics): Component => $metrics->component,
             $componentMetrics,
         );
         $this->dependencyGraph = $dependencyGraph ?? DependencyGraph::fromComponents($components);
+        $this->outOfScopeDependencies = $outOfScopeDependencies ?? OutOfScopeDependencyReport::empty();
         $this->cyclePaths = (new CyclePathFinder())->find($this->dependencyGraph, $cycles);
     }
 

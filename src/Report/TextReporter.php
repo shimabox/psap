@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Psap\Report;
 
 use Psap\Analyzer\ClassInfo;
+use Psap\Component\OutOfScopeDependencyGroup;
 use Psap\Diagnostic\DiagnosticFormatter;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\Zone;
@@ -19,6 +20,12 @@ final class TextReporter implements ReporterInterface
 {
     private const int CYCLE_EVIDENCE_LIMIT = 3;
     private const int DEPENDENCY_SOURCE_LIMIT = 3;
+
+    /** 解析対象外依存のサマリで表示する名前空間グループの上限（verbose では全件） */
+    private const int OUT_OF_SCOPE_GROUP_LIMIT = 5;
+
+    /** verbose のときに名前空間グループごとに表示する証拠の上限 */
+    private const int OUT_OF_SCOPE_EVIDENCE_LIMIT = 3;
 
     /** ゾーン警告なしの通常行に合わせて数値列の幅を揃えるための最小幅（"0.00" 形式は常に4桁） */
     private const int DECIMAL_COLUMN_WIDTH = 4;
@@ -142,6 +149,8 @@ final class TextReporter implements ReporterInterface
             }
         }
 
+        $lines = [...$lines, ...$this->outOfScopeDependencies($data)];
+
         foreach ($data->componentMetrics as $metrics) {
             if (!$this->verbose && $metrics->zone === Zone::None) {
                 continue;
@@ -172,6 +181,85 @@ final class TextReporter implements ReporterInterface
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * 解析対象外依存。通常は全体サマリと上位グループのみ、verbose ではコンポーネント別詳細と証拠も出す。
+     * 0件でもサマリ行は必ず出す。
+     *
+     * @return list<string>
+     */
+    private function outOfScopeDependencies(ReportData $data): array
+    {
+        $report = $data->outOfScopeDependencies;
+
+        $lines = [
+            '',
+            sprintf(
+                'Dependencies outside analysis scope: %s in %s',
+                $this->plural($report->dependencyCount(), 'class', 'classes'),
+                $this->plural($report->groupCount(), 'namespace', 'namespaces'),
+            ),
+        ];
+
+        if ($report->isEmpty()) {
+            return $lines;
+        }
+
+        $visibleGroups = $this->verbose
+            ? $report->groups
+            : array_slice($report->groups, 0, self::OUT_OF_SCOPE_GROUP_LIMIT);
+        foreach ($visibleGroups as $group) {
+            $lines[] = '  ' . $this->outOfScopeGroupLine($group);
+        }
+        $remainingGroups = count($report->groups) - count($visibleGroups);
+        if ($remainingGroups > 0) {
+            $lines[] = sprintf('  ... and %d more namespaces', $remainingGroups);
+        }
+
+        if (!$this->verbose) {
+            return $lines;
+        }
+
+        foreach ($report->components as $component) {
+            $lines[] = '';
+            $lines[] = sprintf('  %s (%s):', $component->name, $this->plural($component->dependencyCount(), 'class', 'classes'));
+            foreach ($component->groups as $group) {
+                $lines[] = '    ' . $this->outOfScopeGroupLine($group);
+                $visibleEvidence = array_slice($group->evidence, 0, self::OUT_OF_SCOPE_EVIDENCE_LIMIT);
+                foreach ($visibleEvidence as $evidence) {
+                    $lines[] = sprintf(
+                        '        %s -> %s (%s) at %s:%d',
+                        $evidence->sourceFqcn,
+                        $evidence->targetFqcn,
+                        $evidence->kind->value,
+                        $evidence->file,
+                        $evidence->line,
+                    );
+                }
+                $remainingEvidence = count($group->evidence) - count($visibleEvidence);
+                if ($remainingEvidence > 0) {
+                    $lines[] = sprintf('        ... and %d more sources', $remainingEvidence);
+                }
+            }
+        }
+
+        return $lines;
+    }
+
+    private function outOfScopeGroupLine(OutOfScopeDependencyGroup $group): string
+    {
+        return sprintf(
+            '- %s: %s referenced by %s',
+            $group->namespace,
+            $this->plural($group->dependencyCount(), 'class', 'classes'),
+            $this->plural($group->sourceCount(), 'class', 'classes'),
+        );
+    }
+
+    private function plural(int $count, string $singular, string $plural): string
+    {
+        return sprintf('%d %s', $count, $count === 1 ? $singular : $plural);
     }
 
     private function classLine(ClassInfo $classInfo): string

@@ -187,6 +187,15 @@ final class PortalReporterTest extends TestCase
         self::assertStringContainsString("markdownSource: 'Markdown レポート（.md）'", $output);
     }
 
+    public function testSourcesTabMarkdownIncludesOutOfScopeDependencySection(): void
+    {
+        // Portal は内部で MarkdownReporter を呼んで Sources タブへ埋め込むため、
+        // Markdown 側に追加したセクションはそのまま埋め込み Markdown にも現れる
+        $output = (new PortalReporter())->render($this->simpleData());
+
+        self::assertStringContainsString('## Dependencies outside analysis scope', $output);
+    }
+
     public function testAllPlaceholdersAreSubstituted(): void
     {
         $output = (new PortalReporter())->render($this->simpleData());

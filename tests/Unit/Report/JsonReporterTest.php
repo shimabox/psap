@@ -7,10 +7,15 @@ namespace Psap\Tests\Unit\Report;
 use PHPUnit\Framework\TestCase;
 use Psap\Analyzer\AnalysisCoverage;
 use Psap\Analyzer\ClassInfo;
+use Psap\Analyzer\DependencyKind;
 use Psap\Analyzer\TypeKind;
 use Psap\Baseline\CycleBaselineComparison;
 use Psap\Component\Component;
 use Psap\Component\DependencyGraph;
+use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyEvidence;
+use Psap\Component\OutOfScopeDependencyGroup;
+use Psap\Component\OutOfScopeDependencyReport;
 use Psap\Diagnostic\Diagnostic;
 use Psap\Diagnostic\DiagnosticAction;
 use Psap\Diagnostic\DiagnosticCode;
@@ -27,6 +32,22 @@ use Psap\Report\ReportData;
  * @phpstan-type Evidence array{kind: string, file: string, line: int}
  * @phpstan-type ClassDependency array{from: string, to: string, evidence: list<Evidence>}
  * @phpstan-type Dependency array{from: string, to: string, classDependencies: list<ClassDependency>}
+ * @phpstan-type OutOfScopeEvidence array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}
+ * @phpstan-type OutOfScopeSummaryGroup array{namespace: string, dependencyCount: int, sourceCount: int, targets: list<string>}
+ * @phpstan-type OutOfScopeGroup array{
+ *     namespace: string,
+ *     dependencyCount: int,
+ *     sourceCount: int,
+ *     targets: list<string>,
+ *     sources: list<string>,
+ *     evidence: list<OutOfScopeEvidence>,
+ * }
+ * @phpstan-type OutOfScopeDependencies array{
+ *     dependencyCount: int,
+ *     groupCount: int,
+ *     groups: list<OutOfScopeSummaryGroup>,
+ *     components: list<array{name: string, dependencyCount: int, groupCount: int, groups: list<OutOfScopeGroup>}>,
+ * }
  * @phpstan-type CycleGroup array{
  *     components: list<string>,
  *     componentCount: int,
@@ -50,6 +71,7 @@ use Psap\Report\ReportData;
  *         classes: list<array{fqcn: string, kind: string}>,
  *     }>,
  *     dependencies: list<Dependency>,
+ *     outOfScopeDependencies: OutOfScopeDependencies,
  *     cycles: list<list<string>>,
  *     cyclePaths: list<array{path: list<string>, dependencies: list<Dependency>}>,
  *     cycleGroups: list<CycleGroup>,
@@ -240,6 +262,81 @@ final class JsonReporterTest extends TestCase
 
         self::assertSame($graph->edgeDetails, $decoded['dependencies']);
         self::assertSame('new', $decoded['dependencies'][0]['classDependencies'][0]['evidence'][0]['kind']);
+    }
+
+    public function testEncodesOutOfScopeDependenciesWithFullEvidence(): void
+    {
+        $report = new OutOfScopeDependencyReport(
+            groups: [
+                new OutOfScopeDependencyGroup(
+                    'Vendor\\Support\\Facades',
+                    ['Vendor\\Support\\Facades\\Cache', 'Vendor\\Support\\Facades\\DB'],
+                    ['App\\Domain\\Order', 'App\\Http\\Controller'],
+                    [],
+                ),
+            ],
+            components: [
+                new OutOfScopeDependencyComponent('App\\Http', [
+                    new OutOfScopeDependencyGroup(
+                        'Vendor\\Support\\Facades',
+                        ['Vendor\\Support\\Facades\\DB'],
+                        ['App\\Http\\Controller'],
+                        [new OutOfScopeDependencyEvidence(
+                            'App\\Http\\Controller',
+                            'Vendor\\Support\\Facades\\DB',
+                            DependencyKind::StaticCall,
+                            'Http/Controller.php',
+                            12,
+                        )],
+                    ),
+                ]),
+            ],
+        );
+        $data = new ReportData([], MetricsSummary::from([]), [], outOfScopeDependencies: $report);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+        $outOfScope = $decoded['outOfScopeDependencies'];
+
+        self::assertSame(2, $outOfScope['dependencyCount']);
+        self::assertSame(1, $outOfScope['groupCount']);
+        self::assertSame([
+            'namespace' => 'Vendor\\Support\\Facades',
+            'dependencyCount' => 2,
+            'sourceCount' => 2,
+            'targets' => ['Vendor\\Support\\Facades\\Cache', 'Vendor\\Support\\Facades\\DB'],
+        ], $outOfScope['groups'][0]);
+        self::assertSame('App\\Http', $outOfScope['components'][0]['name']);
+        self::assertSame(1, $outOfScope['components'][0]['dependencyCount']);
+        self::assertSame(1, $outOfScope['components'][0]['groupCount']);
+        self::assertSame([
+            'namespace' => 'Vendor\\Support\\Facades',
+            'dependencyCount' => 1,
+            'sourceCount' => 1,
+            'targets' => ['Vendor\\Support\\Facades\\DB'],
+            'sources' => ['App\\Http\\Controller'],
+            'evidence' => [[
+                'sourceFqcn' => 'App\\Http\\Controller',
+                'targetFqcn' => 'Vendor\\Support\\Facades\\DB',
+                'kind' => 'static_call',
+                'file' => 'Http/Controller.php',
+                'line' => 12,
+            ]],
+        ], $outOfScope['components'][0]['groups'][0]);
+    }
+
+    public function testEncodesEmptyOutOfScopeDependenciesWithoutOmittingTheKey(): void
+    {
+        $data = new ReportData([], MetricsSummary::from([]), []);
+
+        $decoded = $this->decode((new JsonReporter())->render($data));
+
+        self::assertSame([
+            'dependencyCount' => 0,
+            'groupCount' => 0,
+            'groups' => [],
+            'components' => [],
+        ], $decoded['outOfScopeDependencies']);
+        self::assertStringContainsString('"outOfScopeDependencies"', (new JsonReporter())->render($data));
     }
 
     public function testEncodesEmptyCyclesArrayWhenNoCyclesExist(): void
