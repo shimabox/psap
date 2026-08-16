@@ -619,6 +619,87 @@ final class HtmlReporter implements ReporterInterface
     }
     .evidence-list code { color: var(--ink); overflow-wrap: anywhere; }
 
+    .out-of-scope-panel {
+      margin-top: 18px;
+      border: 1px solid var(--grid);
+      border-top: 5px solid var(--main);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .out-of-scope-header { padding: 22px 24px 0; }
+    .out-of-scope-header h2 {
+      margin: 0;
+      font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+      font-size: clamp(1.55rem, 3vw, 2.2rem);
+      font-weight: 600;
+    }
+    .out-of-scope-header p { max-width: 780px; margin: 8px 0 0; color: var(--muted); font-size: .84rem; }
+    .out-of-scope-total {
+      margin: 16px 24px 0;
+      border-left: 4px solid var(--main);
+      background: rgb(36 87 197 / 7%);
+      padding: 10px 14px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .84rem;
+      font-weight: 700;
+    }
+    .out-of-scope-panel.is-empty { padding-bottom: 20px; }
+    .out-of-scope-panel.is-empty .out-of-scope-total { border-left-color: #2f8f5b; background: rgb(47 143 91 / 8%); }
+    .out-of-scope-subhead {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: .78rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .out-of-scope-groups { padding: 16px 24px 20px; }
+    .out-of-scope-groups:empty { padding: 0; }
+    .out-of-scope-components-head { padding: 4px 24px 12px; }
+    .out-of-scope-table { border: 1px solid var(--grid); overflow: auto; }
+    .out-of-scope-table tbody tr { cursor: default; }
+    .out-of-scope-table tbody tr:hover, .out-of-scope-table tbody tr:focus-within { background: transparent; }
+    .out-of-scope-table td:first-child {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .out-of-scope-toggle {
+      margin-top: 10px;
+      border: 1px solid var(--ink);
+      border-radius: 0;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 7px 14px;
+      cursor: pointer;
+      font-size: .78rem;
+    }
+    .out-of-scope-toggle:hover { background: var(--ink); color: white; }
+    .out-of-scope-component { border-top: 1px solid var(--grid); }
+    .out-of-scope-component > summary { padding: 14px 24px; cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }
+    .out-of-scope-component[open] > summary { background: rgb(36 87 197 / 6%); }
+    .out-of-scope-body { padding: 4px 24px 20px; }
+    .out-of-scope-group { margin-top: 12px; border: 1px solid var(--grid); }
+    .out-of-scope-group h4 {
+      margin: 0;
+      background: #f7fafc;
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .8rem;
+      overflow-wrap: anywhere;
+    }
+    .out-of-scope-counts { margin: 0; padding: 9px 12px; border-top: 1px solid var(--grid); color: var(--muted); font-size: .76rem; }
+    .out-of-scope-evidence {
+      max-height: 220px;
+      margin: 0;
+      padding: 8px 12px 10px 32px;
+      border-top: 1px solid var(--grid);
+      color: var(--muted);
+      font-size: .74rem;
+      overflow: auto;
+    }
+    .out-of-scope-evidence li { padding: 2px 0; }
+    .out-of-scope-evidence code { color: var(--ink); overflow-wrap: anywhere; }
+
     .table-panel {
       margin-top: 18px;
       border: 1px solid var(--grid);
@@ -838,6 +919,18 @@ final class HtmlReporter implements ReporterInterface
       </aside>
     </section>
 
+    <section id="out-of-scope-panel" class="out-of-scope-panel" aria-labelledby="out-of-scope-heading">
+      <header class="out-of-scope-header">
+        <p class="eyebrow" data-i18n="outOfScopeEyebrow">Analysis scope</p>
+        <h2 id="out-of-scope-heading" data-i18n="outOfScopeHeading">Dependencies outside analysis scope</h2>
+        <p data-i18n="outOfScopeIntro">Classes referenced by the analyzed code that belong to no component in this analysis, grouped by the namespace of the referenced class.</p>
+        <p data-i18n="outOfScopeHelp">These references are not counted in Ca, Ce, I, A or D. PHP built-in types are excluded from this list.</p>
+      </header>
+      <p id="out-of-scope-summary" class="out-of-scope-total">—</p>
+      <div id="out-of-scope-groups" class="out-of-scope-groups"></div>
+      <div id="out-of-scope-components"></div>
+    </section>
+
     <section class="table-panel" aria-label="Component data" data-i18n-aria-label="componentData">
       <table>
         <caption data-i18n="matchingComponents">Components matching the current filters</caption>
@@ -926,6 +1019,23 @@ final class HtmlReporter implements ReporterInterface
           componentInCycles: 'Part of {count} cycle groups',
           cycleInspectorText: 'This component participates in a circular dependency.',
           showCycleDetails: 'Show cycle details',
+          outOfScopeEyebrow: 'Analysis scope',
+          outOfScopeHeading: 'Dependencies outside analysis scope',
+          outOfScopeIntro: 'Classes referenced by the analyzed code that belong to no component in this analysis, grouped by the namespace of the referenced class.',
+          outOfScopeHelp: 'These references are not counted in Ca, Ce, I, A or D. PHP built-in types are excluded from this list.',
+          outOfScopeSummary: 'Distinct classes {classes} · Namespaces {namespaces}',
+          outOfScopeNone: 'None (0)',
+          outOfScopeNamespaceHeading: 'Namespaces referenced from the analyzed code',
+          outOfScopeNamespace: 'Namespace',
+          outOfScopeClasses: 'Classes',
+          outOfScopeSources: 'Referencing classes',
+          outOfScopeShowAll: 'Show all {count} namespaces',
+          outOfScopeShowTop: 'Show only the top {count}',
+          outOfScopeComponentsHeading: 'Breakdown by component',
+          outOfScopeComponentSummary: '{name} · Classes {classes} · Namespaces {namespaces}',
+          outOfScopeGroupCounts: 'Classes {classes} · Referencing classes {sources}',
+          outOfScopeNoEvidence: 'No source-location evidence was recorded.',
+          outOfScopeEvidence: '{source} → {target} · {kind} at {file}:{line}',
           graphFilters: 'Graph filters',
           findComponent: 'Find a component or class',
           searchPlaceholder: 'e.g. Domain or UserRepository',
@@ -1044,6 +1154,23 @@ final class HtmlReporter implements ReporterInterface
           componentInCycles: '{count}件の循環グループに含まれます',
           cycleInspectorText: 'このコンポーネントは循環依存に関与しています。',
           showCycleDetails: '循環の詳細を表示',
+          outOfScopeEyebrow: '解析スコープ',
+          outOfScopeHeading: '解析対象外依存',
+          outOfScopeIntro: '解析対象コードが参照しているが、この解析ではどのコンポーネントにも属さないクラスです。参照先クラスの名前空間で束ねています。',
+          outOfScopeHelp: 'これらの参照はCa、Ce、I、A、Dに算入されません。PHP組み込みの型は集計から除外しています。',
+          outOfScopeSummary: '重複を除いたクラス数 {classes} · 名前空間 {namespaces}',
+          outOfScopeNone: '該当なし (0)',
+          outOfScopeNamespaceHeading: '解析対象コードが参照している名前空間',
+          outOfScopeNamespace: '名前空間',
+          outOfScopeClasses: 'クラス数',
+          outOfScopeSources: '参照元クラス数',
+          outOfScopeShowAll: '{count}件すべて表示',
+          outOfScopeShowTop: '上位{count}件のみ表示',
+          outOfScopeComponentsHeading: 'コンポーネント別の内訳',
+          outOfScopeComponentSummary: '{name} · クラス数 {classes} · 名前空間 {namespaces}',
+          outOfScopeGroupCounts: 'クラス数 {classes} · 参照元クラス数 {sources}',
+          outOfScopeNoEvidence: 'ソース位置の根拠は記録されていません。',
+          outOfScopeEvidence: '{source} → {target} · {kind}（{file}:{line}）',
           graphFilters: 'グラフの絞り込み',
           findComponent: 'コンポーネントまたはクラスを検索',
           searchPlaceholder: '例: Domain、UserRepository',
@@ -1146,10 +1273,19 @@ final class HtmlReporter implements ReporterInterface
       const warningList = document.getElementById('warning-list');
       const cyclePanel = document.getElementById('cycle-panel');
       const cycleGroups = document.getElementById('cycle-groups');
+      const outOfScopePanel = document.getElementById('out-of-scope-panel');
+      const outOfScopeSummary = document.getElementById('out-of-scope-summary');
+      const outOfScopeGroups = document.getElementById('out-of-scope-groups');
+      const outOfScopeComponents = document.getElementById('out-of-scope-components');
       const plot = { left: 70, top: 30, size: 540 };
+      // Namespaces shown before the "show all" toggle is used. The payload always
+      // carries every namespace, every component and every piece of evidence, so
+      // expanding is a pure client-side switch.
+      const OUT_OF_SCOPE_PREVIEW_LIMIT = 10;
       let locale = 'en';
       let selected = null;
       let selectedGroup = [];
+      let outOfScopeExpanded = false;
 
       const evaluable = report.components.filter((component) => component.metricsEvaluable);
       document.getElementById('summary-components').textContent = String(report.summary.componentCount);
@@ -1178,6 +1314,7 @@ final class HtmlReporter implements ReporterInterface
         renderCoverage();
         renderDiagnostics();
         update();
+        renderOutOfScope();
         renderCycles();
         if (selected) renderInspector(selected, selectedGroup);
       }
@@ -1471,6 +1608,119 @@ final class HtmlReporter implements ReporterInterface
         });
       }
 
+      // Dependencies outside the analysis scope. The section is always shown —
+      // when nothing was found it says so explicitly, which is itself a result.
+      function renderOutOfScope() {
+        const outOfScope = report.outOfScopeDependencies;
+        const empty = outOfScope.groups.length === 0;
+        outOfScopePanel.classList.toggle('is-empty', empty);
+        outOfScopeSummary.textContent = empty
+          ? t('outOfScopeNone')
+          : t('outOfScopeSummary', { classes: outOfScope.dependencyCount, namespaces: outOfScope.groupCount });
+        renderOutOfScopeGroups(outOfScope.groups);
+        renderOutOfScopeComponents(outOfScope.components);
+      }
+
+      function renderOutOfScopeGroups(groups) {
+        outOfScopeGroups.replaceChildren();
+        if (groups.length === 0) return;
+
+        appendTextElement(outOfScopeGroups, 'h3', t('outOfScopeNamespaceHeading'), 'out-of-scope-subhead');
+
+        const table = document.createElement('table');
+        const head = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        [t('outOfScopeNamespace'), t('outOfScopeClasses'), t('outOfScopeSources')].forEach((label) => {
+          appendTextElement(headRow, 'th', label).scope = 'col';
+        });
+        head.append(headRow);
+        table.append(head);
+
+        const body = document.createElement('tbody');
+        const visible = outOfScopeExpanded ? groups : groups.slice(0, OUT_OF_SCOPE_PREVIEW_LIMIT);
+        visible.forEach((group) => {
+          const row = document.createElement('tr');
+          appendTextElement(row, 'td', group.namespace);
+          appendTextElement(row, 'td', String(group.dependencyCount));
+          appendTextElement(row, 'td', String(group.sourceCount));
+          body.append(row);
+        });
+        table.append(body);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'out-of-scope-table';
+        wrap.append(table);
+        outOfScopeGroups.append(wrap);
+
+        if (groups.length <= OUT_OF_SCOPE_PREVIEW_LIMIT) return;
+        const toggle = appendTextElement(
+          outOfScopeGroups,
+          'button',
+          outOfScopeExpanded ? t('outOfScopeShowTop', { count: OUT_OF_SCOPE_PREVIEW_LIMIT }) : t('outOfScopeShowAll', { count: groups.length }),
+          'out-of-scope-toggle',
+        );
+        toggle.type = 'button';
+        toggle.setAttribute('aria-expanded', outOfScopeExpanded ? 'true' : 'false');
+        toggle.addEventListener('click', () => {
+          outOfScopeExpanded = !outOfScopeExpanded;
+          renderOutOfScopeGroups(groups);
+        });
+      }
+
+      function renderOutOfScopeComponents(components) {
+        outOfScopeComponents.replaceChildren();
+        if (components.length === 0) return;
+
+        const heading = document.createElement('div');
+        heading.className = 'out-of-scope-components-head';
+        appendTextElement(heading, 'h3', t('outOfScopeComponentsHeading'), 'out-of-scope-subhead');
+        outOfScopeComponents.append(heading);
+
+        components.forEach((component) => {
+          const details = document.createElement('details');
+          details.className = 'out-of-scope-component';
+          appendTextElement(details, 'summary', t('outOfScopeComponentSummary', {
+            name: component.name,
+            classes: component.dependencyCount,
+            namespaces: component.groupCount,
+          }));
+
+          const body = document.createElement('div');
+          body.className = 'out-of-scope-body';
+          component.groups.forEach((group) => {
+            const section = document.createElement('section');
+            section.className = 'out-of-scope-group';
+            appendTextElement(section, 'h4', group.namespace);
+            appendTextElement(section, 'p', t('outOfScopeGroupCounts', {
+              classes: group.dependencyCount,
+              sources: group.sourceCount,
+            }), 'out-of-scope-counts');
+            if (group.evidence.length === 0) {
+              appendTextElement(section, 'p', t('outOfScopeNoEvidence'), 'out-of-scope-counts');
+            } else {
+              const evidenceList = document.createElement('ul');
+              evidenceList.className = 'out-of-scope-evidence';
+              group.evidence.forEach((evidence) => {
+                const entry = document.createElement('li');
+                appendTextElement(entry, 'code', t('outOfScopeEvidence', {
+                  source: evidence.sourceFqcn,
+                  target: evidence.targetFqcn,
+                  kind: evidence.kind,
+                  file: evidence.file,
+                  line: evidence.line,
+                }));
+                evidenceList.append(entry);
+              });
+              section.append(evidenceList);
+            }
+            body.append(section);
+          });
+
+          details.append(body);
+          outOfScopeComponents.append(details);
+        });
+      }
+
       function renderCycles() {
         cyclePanel.hidden = report.cycles.length === 0;
         cycleGroups.replaceChildren();
@@ -1753,6 +2003,24 @@ HTML);
      *         zone: 'pain'|'useless'|null,
      *         classes: list<array{fqcn: string, kind: string}>
      *     }>,
+     *     outOfScopeDependencies: array{
+     *         dependencyCount: int,
+     *         groupCount: int,
+     *         groups: list<array{namespace: string, dependencyCount: int, sourceCount: int, targets: list<string>}>,
+     *         components: list<array{
+     *             name: string,
+     *             dependencyCount: int,
+     *             groupCount: int,
+     *             groups: list<array{
+     *                 namespace: string,
+     *                 dependencyCount: int,
+     *                 sourceCount: int,
+     *                 targets: list<string>,
+     *                 sources: list<string>,
+     *                 evidence: list<array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}>,
+     *             }>,
+     *         }>,
+     *     },
      *     cycles: list<array{
      *         components: list<string>,
      *         componentCount: int,
@@ -1807,6 +2075,9 @@ HTML);
                 $data->diagnostics,
             ),
             'components' => array_map($this->componentPayload(...), $data->componentMetrics),
+            // JSON レポートと同形（同じ値オブジェクトのシリアライズ）。全量を渡し、
+            // 上位10件の初期表示や展開はクライアント側で出し分ける。
+            'outOfScopeDependencies' => $data->outOfScopeDependencies->jsonSerialize(),
             'cycles' => $data->cycleGroups(),
         ];
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psap\Component;
 
+use JsonSerializable;
 use Psap\Analyzer\DependencyKind;
 
 /**
@@ -12,7 +13,7 @@ use Psap\Analyzer\DependencyKind;
  * 依存グラフの edgeDetails と同じ粒度（構文種別とソース位置）に、
  * どのクラスからどの解析対象外 FQCN への依存かを添えたもの。
  */
-final readonly class OutOfScopeDependencyEvidence
+final readonly class OutOfScopeDependencyEvidence implements JsonSerializable
 {
     public function __construct(
         public string $sourceFqcn,
@@ -21,5 +22,21 @@ final readonly class OutOfScopeDependencyEvidence
         public string $file,
         public int $line,
     ) {
+    }
+
+    /**
+     * 証拠形式。json / html レポートが共通で使う。
+     *
+     * @return array{sourceFqcn: string, targetFqcn: string, kind: string, file: string, line: int}
+     */
+    public function jsonSerialize(): array
+    {
+        return [
+            'sourceFqcn' => $this->sourceFqcn,
+            'targetFqcn' => $this->targetFqcn,
+            'kind' => $this->kind->value,
+            'file' => $this->file,
+            'line' => $this->line,
+        ];
     }
 }

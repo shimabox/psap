@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Psap\Report;
 
 use JsonException;
+use Psap\Component\OutOfScopeDependencyComponent;
+use Psap\Component\OutOfScopeDependencyGroup;
+use Psap\Component\OutOfScopeDependencyReport;
 use Psap\Metrics\ComponentMetrics;
 use Psap\Metrics\Zone;
 use RuntimeException;
@@ -32,6 +35,18 @@ final class PortalReporter implements ReporterInterface
 
     /** Overview の「D 値ワースト」に表示する最大件数 */
     private const int WORST_DISTANCE_LIMIT = 10;
+
+    /**
+     * Overview の解析対象外依存に表示する上限。
+     *
+     * Overview は要約なので固定の上限で打ち切り、超過分は件数だけを示す。
+     * 全量（全名前空間・全コンポーネント・全証拠）は Interactive I/A タブで確認する。
+     */
+    private const int OUT_OF_SCOPE_GROUP_LIMIT = 10;
+
+    private const int OUT_OF_SCOPE_COMPONENT_LIMIT = 10;
+
+    private const int OUT_OF_SCOPE_EVIDENCE_LIMIT = 3;
 
     private const string MERMAID_ASSET_PATH = __DIR__ . '/../../resources/js/mermaid.min.js';
 
@@ -174,8 +189,12 @@ final class PortalReporter implements ReporterInterface
         $rows .= $this->statCard('plotted', (string) count($plotted));
         $rows .= $this->statCard('meanDistance', $meanDistance);
         $rows .= $this->statCard('cycleGroups', (string) count($data->cycles), count($data->cycles) > 0);
+        $rows .= $this->statCard(
+            'outOfScopeDependencies',
+            (string) $data->outOfScopeDependencies->dependencyCount(),
+        );
 
-        $html = '<dl class="stat-grid">' . $rows . '</dl>';
+        $html = '<dl class="stat-grid summary">' . $rows . '</dl>';
 
         $coverage = $data->analysisCoverage;
         if ($coverage !== null) {
@@ -201,8 +220,139 @@ final class PortalReporter implements ReporterInterface
 
         $html .= '<h3 class="panel-title" data-i18n="worstDistanceHeading">Highest distance from the main sequence</h3>';
         $html .= $this->renderWorstTable($plotted);
+        $html .= $this->renderOutOfScope($data->outOfScopeDependencies);
 
         return $html;
+    }
+
+    /**
+     * 解析対象外依存（Overview 版）。
+     *
+     * 0 件でもセクションごと消さず、0 件だと分かる表示にする。件数の多い解析では
+     * 上限で打ち切るため、超過分は件数だけを示して Interactive I/A タブへ誘導する。
+     *
+     * 数値は翻訳対象の <span> の外に置く。Overview はサーバーサイド描画で、
+     * クライアントの applyLanguage() は data-i18n 要素の textContent を丸ごと
+     * 置き換えるため、翻訳文中にプレースホルダを埋めても展開されない。
+     */
+    private function renderOutOfScope(OutOfScopeDependencyReport $report): string
+    {
+        $html = '<h3 class="panel-title" data-i18n="outOfScopeHeading">Dependencies outside analysis scope</h3>';
+        $html .= '<p class="scope-note" data-i18n="outOfScopeHelp">'
+            . 'These references are not counted in Ca, Ce, I, A or D.'
+            . ' PHP built-in types are excluded from this list.</p>';
+
+        if ($report->isEmpty()) {
+            return $html . '<p class="empty ok" data-i18n="outOfScopeNone">'
+                . 'No dependencies outside the analysis scope were found.</p>';
+        }
+
+        // 数値は「ラベル 値」の順で置く。単複で語形が変わる英語を数値の後ろに置くと
+        // 1 件のときに文法が崩れるため。
+        $html .= '<p class="notice"><span data-i18n="outOfScopeClasses">Classes</span> '
+            . $report->dependencyCount()
+            . ' · <span data-i18n="outOfScopeNamespaceCount">Namespaces</span> '
+            . $report->groupCount() . '. '
+            . '<span data-i18n="outOfScopeInteractiveHint">'
+            . 'See the Interactive I/A tab for every namespace, component and source location.</span></p>';
+        $html .= $this->renderOutOfScopeGroups($report->groups);
+        $html .= $this->renderOutOfScopeComponents($report->components);
+
+        return $html;
+    }
+
+    /**
+     * @param list<OutOfScopeDependencyGroup> $groups
+     */
+    private function renderOutOfScopeGroups(array $groups): string
+    {
+        $body = '';
+        foreach (array_slice($groups, 0, self::OUT_OF_SCOPE_GROUP_LIMIT) as $group) {
+            $body .= '<tr>'
+                . '<td>' . $this->escape($group->namespace) . '</td>'
+                . '<td>' . $group->dependencyCount() . '</td>'
+                . '<td>' . $group->sourceCount() . '</td>'
+                . '</tr>';
+        }
+
+        $html = '<div class="table-wrap"><table><thead><tr>'
+            . '<th data-i18n="outOfScopeNamespace">Namespace</th>'
+            . '<th data-i18n="outOfScopeClasses">Classes</th>'
+            . '<th data-i18n="outOfScopeSources">Referencing classes</th>'
+            . '</tr></thead><tbody>' . $body . '</tbody></table></div>';
+
+        return $html . $this->remainder(
+            count($groups) - self::OUT_OF_SCOPE_GROUP_LIMIT,
+            'outOfScopeMoreNamespaces',
+            'more namespaces',
+        );
+    }
+
+    /**
+     * @param list<OutOfScopeDependencyComponent> $components
+     */
+    private function renderOutOfScopeComponents(array $components): string
+    {
+        $html = '<h3 class="panel-title" data-i18n="outOfScopeComponentsHeading">Breakdown by component</h3>';
+
+        foreach (array_slice($components, 0, self::OUT_OF_SCOPE_COMPONENT_LIMIT) as $component) {
+            $summary = $this->escape($component->name)
+                . ' · <span data-i18n="outOfScopeClasses">Classes</span> ' . $component->dependencyCount();
+
+            $body = '';
+            foreach ($component->groups as $group) {
+                $body .= '<div class="edge"><h4>' . $this->escape($group->namespace) . '</h4>'
+                    . '<div class="class-dep"><p class="scope-note">'
+                    . '<span data-i18n="outOfScopeClasses">Classes</span> ' . $group->dependencyCount()
+                    . ' · <span data-i18n="outOfScopeSources">Referencing classes</span> ' . $group->sourceCount()
+                    . '</p>'
+                    . $this->renderOutOfScopeEvidence($group)
+                    . '</div></div>';
+            }
+
+            $html .= '<details class="scope-group"><summary>' . $summary . '</summary>'
+                . '<div class="scope-body">' . $body . '</div></details>';
+        }
+
+        return $html . $this->remainder(
+            count($components) - self::OUT_OF_SCOPE_COMPONENT_LIMIT,
+            'outOfScopeMoreComponents',
+            'more components',
+        );
+    }
+
+    private function renderOutOfScopeEvidence(OutOfScopeDependencyGroup $group): string
+    {
+        if ($group->evidence === []) {
+            return '<p class="scope-note" data-i18n="noSourceEvidence">'
+                . 'No source-location evidence was recorded.</p>';
+        }
+
+        $html = '<ul class="evidence">';
+        foreach (array_slice($group->evidence, 0, self::OUT_OF_SCOPE_EVIDENCE_LIMIT) as $evidence) {
+            $html .= '<li><code>' . $this->escape($evidence->sourceFqcn)
+                . ' &rarr; ' . $this->escape($evidence->targetFqcn) . '</code> · <code>'
+                . $this->escape($evidence->kind->value) . '</code> · '
+                . $this->escape($evidence->file) . ':' . $evidence->line . '</li>';
+        }
+        $html .= '</ul>';
+
+        return $html . $this->remainder(
+            count($group->evidence) - self::OUT_OF_SCOPE_EVIDENCE_LIMIT,
+            'outOfScopeMoreEvidence',
+            'more source locations omitted',
+        );
+    }
+
+    /** 上限で打ち切った残件数の表示。0 件以下なら何も出さない。 */
+    private function remainder(int $remaining, string $labelKey, string $fallback): string
+    {
+        if ($remaining <= 0) {
+            return '';
+        }
+
+        return '<p class="scope-note">+' . $remaining
+            . ' <span data-i18n="' . $labelKey . '">' . $fallback . '</span></p>';
     }
 
     /**
@@ -488,7 +638,7 @@ final class PortalReporter implements ReporterInterface
       border: 1px solid var(--grid);
       background: rgb(255 255 255 / 82%);
     }
-    .stat-grid.ledger { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .stat-grid.ledger, .stat-grid.summary { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .stat-grid div { padding: 14px 16px; }
     .stat-grid div + div { border-left: 1px solid var(--grid); }
     .stat-grid dt {
@@ -616,6 +766,14 @@ final class PortalReporter implements ReporterInterface
     .class-dep > code { display: inline-block; }
     .evidence { max-height: 200px; margin: 7px 0 0; padding-left: 18px; overflow: auto; color: var(--muted); font-size: .76rem; }
     .edge-empty { margin: 6px 0 0; color: var(--muted); font-size: .78rem; }
+    .scope-note { margin: 8px 0 0; color: var(--muted); font-size: .78rem; }
+    .evidence + .scope-note { margin-top: 2px; }
+    /* 解析対象外依存の折りたたみ。循環（.cycle-group）と同じ骨格だが、
+       ADP違反ではないので開いたときの色は赤ではなく主色にする。 */
+    .scope-group { border: 1px solid var(--grid); margin-bottom: 10px; }
+    .scope-group > summary { padding: 14px 18px; cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }
+    .scope-group[open] > summary { background: rgb(36 87 197 / 6%); }
+    .scope-body { padding: 4px 18px 20px; }
     .source-block { margin-bottom: 28px; }
     .source-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
     .source-head h3 { margin: 0; font-size: .92rem; }
@@ -644,7 +802,7 @@ final class PortalReporter implements ReporterInterface
     footer { margin-top: 26px; color: var(--muted); font-size: .74rem; }
     @media (max-width: 820px) {
       .masthead { grid-template-columns: 1fr; }
-      .stat-grid, .stat-grid.ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stat-grid, .stat-grid.ledger, .stat-grid.summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .stat-grid div:nth-child(n+3) { border-top: 1px solid var(--grid); }
       .stat-grid div:nth-child(odd) { border-left: 0; }
     }
@@ -780,6 +938,7 @@ __PSAP_MERMAID_LICENSE__
           plotted: 'Plotted',
           meanDistance: 'Mean D',
           cycleGroups: 'Cycle groups',
+          outOfScopeDependencies: 'Outside scope',
           analysisCoverage: 'Analysis coverage',
           discoveredFiles: 'Discovered',
           selectedFiles: 'Selected',
@@ -795,6 +954,18 @@ __PSAP_MERMAID_LICENSE__
           uselessZone: 'Useless zone',
           mainSequence: 'Main sequence',
           noComponents: 'No components with evaluable metrics.',
+          outOfScopeHeading: 'Dependencies outside analysis scope',
+          outOfScopeHelp: 'These references are not counted in Ca, Ce, I, A or D. PHP built-in types are excluded from this list.',
+          outOfScopeNone: 'No dependencies outside the analysis scope were found.',
+          outOfScopeInteractiveHint: 'See the Interactive I/A tab for every namespace, component and source location.',
+          outOfScopeNamespace: 'Namespace',
+          outOfScopeClasses: 'Classes',
+          outOfScopeSources: 'Referencing classes',
+          outOfScopeNamespaceCount: 'Namespaces',
+          outOfScopeComponentsHeading: 'Breakdown by component',
+          outOfScopeMoreNamespaces: 'more namespaces',
+          outOfScopeMoreComponents: 'more components',
+          outOfScopeMoreEvidence: 'more source locations omitted',
           interactiveHint: 'The interactive Instability / Abstractness report is embedded below. It follows the language selector above.',
           interactiveTitle: 'psap interactive I/A report',
           quadrantHeading: 'I/A quadrant chart',
@@ -848,6 +1019,7 @@ __PSAP_MERMAID_LICENSE__
           plotted: 'プロット',
           meanDistance: '平均D',
           cycleGroups: '循環グループ',
+          outOfScopeDependencies: '解析対象外',
           analysisCoverage: '解析カバレッジ',
           discoveredFiles: '発見',
           selectedFiles: '選択',
@@ -863,6 +1035,18 @@ __PSAP_MERMAID_LICENSE__
           uselessZone: '無駄ゾーン',
           mainSequence: '主系列',
           noComponents: '評価可能な指標を持つコンポーネントがありません。',
+          outOfScopeHeading: '解析対象外依存',
+          outOfScopeHelp: 'これらの参照はCa、Ce、I、A、Dに算入されません。PHP組み込みの型は集計から除外しています。',
+          outOfScopeNone: '解析対象外依存は検出されませんでした。',
+          outOfScopeInteractiveHint: '全名前空間・全コンポーネント・全コード位置は「対話型 I/A」タブで確認できます。',
+          outOfScopeNamespace: '名前空間',
+          outOfScopeClasses: 'クラス数',
+          outOfScopeSources: '参照元クラス数',
+          outOfScopeNamespaceCount: '名前空間',
+          outOfScopeComponentsHeading: 'コンポーネント別の内訳',
+          outOfScopeMoreNamespaces: '件の名前空間を省略',
+          outOfScopeMoreComponents: '件のコンポーネントを省略',
+          outOfScopeMoreEvidence: '件のコード位置を省略',
           interactiveHint: '対話型の不安定度／抽象度レポートを下に埋め込んでいます。言語は上のセレクターに追従します。',
           interactiveTitle: 'psap 対話型 I/A レポート',
           quadrantHeading: 'I/A 象限チャート',
